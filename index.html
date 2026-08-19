@@ -397,6 +397,21 @@ function CustomerOrderForm() {
   const [errMsg, setErrMsg] = useState("");
   const [ordersOpen, setOrdersOpen] = useState(null);
   const [fees, setFees] = useState({ rak: 30, other: 60 });
+  const [geo, setGeo] = useState("idle"); // idle | loading | done | error
+  const [coords, setCoords] = useState(null);
+
+  const shareLocation = () => {
+    if (!navigator.geolocation) { setGeo("error"); return; }
+    setGeo("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeo("done");
+      },
+      () => setGeo("error"),
+      { enableHighAccuracy: true, timeout: 12000 }
+    );
+  };
 
   useEffect(() => {
     (async () => {
@@ -432,8 +447,9 @@ function CustomerOrderForm() {
       if (form.fulfillment === "توصيل") {
         payload.emirate = form.emirate;
         payload.area = form.area;
-        payload.delivery_location = form.delivery_location;
         payload.house_number = form.house_number;
+        const mapUrl = coords ? `https://maps.google.com/?q=${coords.lat},${coords.lng}` : "";
+        payload.delivery_location = [mapUrl, form.delivery_location].filter(Boolean).join(" | ");
       }
       const { error } = await supabase.from("incoming_orders").insert(payload);
       if (error) { console.error(error); setErrMsg(error.message || "تعذّر إرسال الطلب"); setStatus("error"); return; }
@@ -499,6 +515,8 @@ function CustomerOrderForm() {
             <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 700, fontSize: 16, color: COLORS.deep }}>تم استلام طلبك بنجاح</div>
             <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.9 }}>
               سيتم التواصل معك لتأكيد الطلب، وتحديد موعد التسليم حسب توفر الإنتاج.
+              <br />
+              <b style={{ color: COLORS.secondary }}>الدفع عند الاستلام.</b>
             </div>
           </div>
         ) : (
@@ -553,8 +571,31 @@ function CustomerOrderForm() {
                   <label style={{ fontSize: 12.5, color: COLORS.deep }}>رقم المنزل / الفيلا
                     <input required value={form.house_number} onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
                   </label>
-                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>وصف الموقع أو رابط الموقع (اختياري)
-                    <input value={form.delivery_location} onChange={(e) => setForm((f) => ({ ...f, delivery_location: e.target.value }))} placeholder="رابط خرائط جوجل أو وصف" style={{ ...inputStyle, marginTop: 4 }} />
+                  <div>
+                    <div style={{ fontSize: 12.5, color: COLORS.deep, marginBottom: 6 }}>موقع التوصيل</div>
+                    <button type="button" onClick={shareLocation} disabled={geo === "loading"}
+                      style={{
+                        width: "100%", padding: "11px 14px", borderRadius: 10, cursor: "pointer",
+                        fontSize: 13, fontWeight: 700,
+                        border: `1px solid ${geo === "done" ? COLORS.secondary : COLORS.primary}`,
+                        background: geo === "done" ? "#E7F0D8" : "#fff",
+                        color: geo === "done" ? COLORS.secondary : COLORS.primary,
+                      }}>
+                      {geo === "loading" ? "جارٍ تحديد الموقع…"
+                        : geo === "done" ? "✓ تم تحديد موقعك"
+                        : "📍 شارك موقعك الحالي"}
+                    </button>
+                    {geo === "error" && (
+                      <div style={{ fontSize: 11.5, color: COLORS.alert, marginTop: 6, lineHeight: 1.8 }}>
+                        تعذّر تحديد الموقع. اسمح بالوصول للموقع، أو اكتب وصفاً بالأسفل.
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.8 }}>
+                      يساعد المندوب على الوصول إليك بدقة.
+                    </div>
+                  </div>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>وصف الموقع (اختياري)
+                    <input value={form.delivery_location} onChange={(e) => setForm((f) => ({ ...f, delivery_location: e.target.value }))} placeholder="أقرب معلم أو وصف مختصر" style={{ ...inputStyle, marginTop: 4 }} />
                   </label>
                   {form.emirate && (
                     <div style={{ fontSize: 12, color: COLORS.deep, fontWeight: 700 }}>
@@ -583,6 +624,9 @@ function CustomerOrderForm() {
                   <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${COLORS.line}`, paddingTop: 6, marginTop: 6, fontWeight: 800, color: COLORS.deep }}>
                     <span>الإجمالي</span>
                     <span>{fmt(grandTotal)} درهم</span>
+                  </div>
+                  <div style={{ marginTop: 10, background: "#E7F0D8", color: COLORS.secondary, borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, textAlign: "center" }}>
+                    💵 الدفع عند الاستلام
                   </div>
                 </div>
               )}
@@ -867,6 +911,7 @@ function MainApp({ session }) {
   const [tab, setTab] = useState("dashboard");
   const [data, setData] = useState({ bags: [], boxes: [], purchases: [], orders: [], sales: [], nafia: [], gifts: [], costs: [], withdrawals: [], partners: [] });
   const [incoming, setIncoming] = useState([]);
+  const [cancelled, setCancelled] = useState([]);
   const [ordersOpen, setOrdersOpen] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState(null);
@@ -887,6 +932,8 @@ function MainApp({ session }) {
     setData(next);
     const { data: inc } = await supabase.from("incoming_orders").select("*").eq("status", "pending").order("submitted_at", { ascending: true });
     setIncoming(inc || []);
+    const { data: canc } = await supabase.from("incoming_orders").select("*").eq("status", "cancelled").order("submitted_at", { ascending: false });
+    setCancelled(canc || []);
     const openVal = await getSetting("orders_open", true);
     setOrdersOpen(openVal !== false && openVal !== "false");
     setLoaded(true);
@@ -944,10 +991,12 @@ function MainApp({ session }) {
     await loadAll();
     showToast("تمت إضافة الطلب");
   };
-  const rejectIncoming = async (item) => {
-    await supabase.from("incoming_orders").update({ status: "rejected" }).eq("id", item.id);
+  const cancelIncoming = async (item) => {
+    if (!window.confirm(`تأكيد إلغاء طلب ${item.name}؟\nسينتقل إلى قائمة الطلبات الملغاة.`)) return;
+    await supabase.from("incoming_orders").update({ status: "cancelled" }).eq("id", item.id);
     setIncoming((list) => list.filter((x) => x.id !== item.id));
-    showToast("تم تجاهل الطلب");
+    setCancelled((list) => [{ ...item, status: "cancelled" }, ...list]);
+    showToast("تم إلغاء الطلب — أرسل إشعاراً للعميل من قائمة الملغاة");
   };
 
   const logout = async () => { await supabase.auth.signOut(); };
@@ -996,7 +1045,7 @@ function MainApp({ session }) {
         {tab === "sources" && <SourceSummary summary={sourceSummary} />}
         {tab === "partners" && <Partners partners={data.partners} distribution={partnersDistribution} withdrawals={data.withdrawals} boughtNet={sourceSummary.bought.net} onReload={loadAll} showToast={showToast} />}
         {tab === "orders" && (
-          <IncomingOrders incoming={incoming} onAccept={acceptIncoming} onReject={rejectIncoming} ordersOpen={ordersOpen} onToggleOrders={toggleOrders} />
+          <IncomingOrders incoming={incoming} cancelled={cancelled} onAccept={acceptIncoming} onCancel={cancelIncoming} ordersOpen={ordersOpen} onToggleOrders={toggleOrders} onReload={loadAll} />
         )}
         {Object.keys(TABLES).includes(tab) && (
           <DataTable tableKey={tab} config={TABLES[tab]} rows={computedRows[tab] || []} ordersRows={tab === "sales" ? computedRows.orders : undefined} onReload={loadAll} showToast={showToast} />
@@ -1083,14 +1132,19 @@ function SourceSummary({ summary }) {
   );
 }
 
-function waLink(phone, item) {
+function intlPhone(phone) {
   const digits = String(phone || "").replace(/[^0-9]/g, "");
   if (!digits) return "";
-  // تحويل الرقم المحلي إلى صيغة دولية للإمارات
-  const intl = digits.startsWith("00") ? digits.slice(2)
+  return digits.startsWith("00") ? digits.slice(2)
     : digits.startsWith("971") ? digits
     : digits.startsWith("0") ? "971" + digits.slice(1)
     : digits;
+}
+
+/* رسالة تأكيد استلام الطلب */
+function waLink(phone, item) {
+  const intl = intlPhone(phone);
+  if (!intl) return "";
   const boxes = num(item.qty);
   const fee = num(item.delivery_fee);
   const total = boxes * DEFAULT_BOX_PRICE + fee;
@@ -1106,71 +1160,146 @@ function waLink(phone, item) {
   if (fee > 0) lines.push(`• رسوم التوصيل: ${fmt(fee)} درهم`);
   lines.push(`• الإجمالي: ${fmt(total)} درهم`);
   lines.push("");
+  lines.push("💵 الدفع عند الاستلام.");
+  lines.push("");
+  if (item.fulfillment === "توصيل") {
+    lines.push("📍 نرجو مشاركة موقعكم عبر واتساب (Location) مع رقم المنزل، لتسهيل وصول المندوب إليكم.");
+    lines.push("");
+  }
   lines.push("نظراً لأن الإنتاج طبيعي ويعتمد على عوامل عدة، سيتم التواصل معكم لتحديد موعد التسليم فور توفر الكمية بإذن الله.");
   lines.push("");
   lines.push("شاكرين لكم حسن تعاملكم 🌴");
   return `https://wa.me/${intl}?text=${encodeURIComponent(lines.join("\n"))}`;
 }
 
-function IncomingOrders({ incoming, onAccept, onReject, ordersOpen, onToggleOrders }) {
+/* رسالة إشعار بإلغاء الطلب */
+function waCancelLink(phone, item) {
+  const intl = intlPhone(phone);
+  if (!intl) return "";
+  const lines = [
+    `مرحباً ${item.first_name || item.name || ""} 👋`,
+    "",
+    `نفيدكم بأنه تم إلغاء طلبكم (${fmt(num(item.qty))} علبة).`,
+    "",
+    "نعتذر عن أي إزعاج، ويسعدنا استقبال طلبكم مرة أخرى في أي وقت.",
+    "",
+    "شاكرين لكم تفهمكم 🌴",
+  ];
+  return `https://wa.me/${intl}?text=${encodeURIComponent(lines.join("\n"))}`;
+}
+
+function IncomingOrders({ incoming, cancelled, onAccept, onCancel, ordersOpen, onToggleOrders, onReload }) {
+  const [view, setView] = useState("pending");
+  const list = view === "pending" ? incoming : cancelled;
+
   return (
     <div style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
-        <SectionTitle title="الطلبات الواردة إلكترونياً" subtitle={incoming.length ? `${incoming.length} بانتظار المراجعة` : "لا توجد طلبات جديدة"} />
-        <button onClick={onToggleOrders} style={{
-          padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 12.5, fontWeight: 700,
-          border: `1px solid ${ordersOpen ? COLORS.alert : COLORS.secondary}`,
-          background: ordersOpen ? "#fff" : COLORS.secondary,
-          color: ordersOpen ? COLORS.alert : "#fff",
-        }}>
-          {ordersOpen ? "⏸️ إيقاف استقبال الطلبات" : "▶️ فتح استقبال الطلبات"}
-        </button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <SectionTitle title="الطلبات الإلكترونية" subtitle={incoming.length ? `${incoming.length} بانتظار المراجعة` : "لا توجد طلبات جديدة"} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={onReload} style={ghostBtnStyle}>🔄 تحديث</button>
+          <button onClick={onToggleOrders} style={{
+            padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 12.5, fontWeight: 700,
+            border: `1px solid ${ordersOpen ? COLORS.alert : COLORS.secondary}`,
+            background: ordersOpen ? "#fff" : COLORS.secondary,
+            color: ordersOpen ? COLORS.alert : "#fff",
+          }}>
+            {ordersOpen ? "⏸️ إيقاف الطلبات" : "▶️ فتح الطلبات"}
+          </button>
+        </div>
       </div>
 
       {!ordersOpen && (
-        <div style={{ background: COLORS.amberLight, borderRadius: 12, padding: "10px 14px", fontSize: 12.5, color: COLORS.deep, marginBottom: 12 }}>
+        <div style={{ background: COLORS.amberLight, borderRadius: 12, padding: "10px 14px", fontSize: 12.5, color: COLORS.deep, marginBottom: 14 }}>
           استقبال الطلبات متوقف حالياً — يظهر للعملاء في الرابط: «نفذت الكمية».
         </div>
       )}
 
-      <div style={{ display: "grid", gap: 10 }}>
-        {incoming.map((item) => {
-          const wa = waLink(item.phone, item);
-          const fee = num(item.delivery_fee);
-          const total = num(item.qty) * DEFAULT_BOX_PRICE + fee;
-          return (
-            <div key={item.id} style={{ background: COLORS.surface, borderRadius: 12, border: `1px solid ${COLORS.line}`, borderInlineStart: `4px solid ${COLORS.primary}`, padding: "12px 14px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
-                <div style={{ flex: "1 1 200px" }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
-                  <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.9, marginTop: 3 }}>
-                    {fmt(item.qty)} علبة — {item.fulfillment || "استلام"}
-                    {fee > 0 ? ` — توصيل ${fmt(fee)} درهم` : ""}
-                    <br />
-                    <b style={{ color: COLORS.deep }}>الإجمالي: {fmt(total)} درهم</b>
-                    {item.phone ? <><br />📞 {item.phone}</> : null}
-                    {item.fulfillment === "توصيل" && (
-                      <><br />📍 {item.emirate} — {item.area} — منزل {item.house_number}
-                      {item.delivery_location ? <><br />🗺️ {item.delivery_location}</> : null}</>
+      {/* تبديل العرض */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[
+          { k: "pending", label: `الواردة (${incoming.length})` },
+          { k: "cancelled", label: `الملغاة (${cancelled.length})` },
+        ].map((t) => (
+          <button key={t.k} onClick={() => setView(t.k)} style={{
+            padding: "8px 16px", borderRadius: 20, cursor: "pointer", fontSize: 12.5,
+            fontWeight: view === t.k ? 700 : 500, border: `1px solid ${COLORS.line}`,
+            background: view === t.k ? COLORS.deep : "#fff",
+            color: view === t.k ? "#F3E9D8" : COLORS.inkSoft,
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {list.length === 0 ? (
+        <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, padding: "30px 16px", textAlign: "center", color: COLORS.inkSoft, fontSize: 13.5 }}>
+          {view === "pending" ? "لا توجد طلبات واردة حالياً." : "لا توجد طلبات ملغاة."}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {list.map((item) => {
+            const isCancelled = view === "cancelled";
+            const wa = isCancelled ? waCancelLink(item.phone, item) : waLink(item.phone, item);
+            const fee = num(item.delivery_fee);
+            const total = num(item.qty) * DEFAULT_BOX_PRICE + fee;
+            return (
+              <div key={item.id} style={{
+                background: COLORS.surface, borderRadius: 12, border: `1px solid ${COLORS.line}`,
+                borderInlineStart: `4px solid ${isCancelled ? COLORS.alert : COLORS.primary}`,
+                padding: "12px 14px", opacity: isCancelled ? 0.85 : 1,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ flex: "1 1 200px" }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                      {item.name}
+                      {isCancelled && <span style={{ marginInlineStart: 8, fontSize: 11, color: COLORS.alert, fontWeight: 700 }}>· ملغى</span>}
+                    </div>
+                    <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.9, marginTop: 3 }}>
+                      {fmt(item.qty)} علبة — {item.fulfillment || "استلام"}
+                      {fee > 0 ? ` — توصيل ${fmt(fee)} درهم` : ""}
+                      <br />
+                      <b style={{ color: COLORS.deep }}>الإجمالي: {fmt(total)} درهم</b>
+                      <span style={{ color: COLORS.secondary, fontWeight: 700 }}> · الدفع عند الاستلام</span>
+                      {item.phone ? <><br />📞 {item.phone}</> : null}
+                      {item.fulfillment === "توصيل" && (() => {
+                        const loc = String(item.delivery_location || "");
+                        const url = (loc.match(/https?:\/\/\S+/) || [])[0] || "";
+                        const desc = loc.replace(url, "").replace(/^\s*\|\s*/, "").trim();
+                        return (
+                          <><br />📍 {item.emirate} — {item.area} — منزل {item.house_number}
+                          {url && (
+                            <><br />
+                              <a href={url} target="_blank" rel="noopener noreferrer"
+                                style={{ color: COLORS.primary, fontWeight: 700, textDecoration: "none" }}>
+                                🗺️ فتح الموقع في الخرائط
+                              </a>
+                            </>
+                          )}
+                          {desc ? <><br />📝 {desc}</> : null}</>
+                        );
+                      })()}
+                      {item.notes ? <><br />📝 {item.notes}</> : null}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {wa && (
+                      <a href={wa} target="_blank" rel="noopener noreferrer"
+                        style={{ ...primaryBtnStyle, background: "#25D366", textDecoration: "none", display: "inline-block" }}>
+                        {isCancelled ? "إشعار الإلغاء" : "تأكيد بواتساب"}
+                      </a>
                     )}
-                    {item.notes ? <><br />📝 {item.notes}</> : null}
+                    {!isCancelled && (
+                      <>
+                        <button onClick={() => onAccept(item)} style={primaryBtnStyle}>قبول</button>
+                        <button onClick={() => onCancel(item)} style={{ ...ghostBtnStyle, color: COLORS.alert, borderColor: COLORS.alert }}>إلغاء الطلب</button>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {wa && (
-                    <a href={wa} target="_blank" rel="noopener noreferrer"
-                      style={{ ...primaryBtnStyle, background: "#25D366", textDecoration: "none", display: "inline-block" }}>
-                      واتساب
-                    </a>
-                  )}
-                  <button onClick={() => onAccept(item)} style={primaryBtnStyle}>قبول</button>
-                  <button onClick={() => onReject(item)} style={dangerBtnStyle}>تجاهل</button>
-                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
