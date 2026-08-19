@@ -16,6 +16,21 @@
   table { border-collapse: collapse; width: 100%; }
   th, td { text-align: right; padding: 8px 10px; font-size: 13px; white-space: nowrap; }
   input, select { font-family: Tajawal, sans-serif; }
+
+  /* ===== تخطيط صفحة القصة ===== */
+  .st-row { display: grid; grid-template-columns: 1fr; gap: 26px; align-items: center; margin: 0 0 70px; }
+  .st-stack { position: relative; padding-bottom: 46px; padding-inline-start: 40px; }
+  .st-img-a { width: 78%; border-radius: 16px; display: block; box-shadow: 0 18px 40px rgba(74,37,17,.22); object-fit: cover; aspect-ratio: 3/4; }
+  .st-img-b { position: absolute; bottom: 0; inset-inline-start: 0; width: 46%; border-radius: 14px;
+              border: 5px solid #FBF6EC; box-shadow: 0 14px 30px rgba(74,37,17,.26); object-fit: cover; aspect-ratio: 1/1; }
+  .st-num { font-family: Cairo, sans-serif; font-weight: 800; font-size: 54px; line-height: 1;
+            color: #E7DAC5; margin-bottom: -14px; }
+  @media (min-width: 720px) {
+    .st-row { grid-template-columns: 1fr 1fr; gap: 46px; margin-bottom: 96px; }
+    .st-row.rev .st-media { order: 2; }
+    .st-img-a { width: 82%; }
+    .st-img-b { width: 50%; }
+  }
 </style>
 </head>
 <body>
@@ -459,7 +474,7 @@ function CustomerOrderForm() {
           <LogoLockup size={50} center />
         </div>
         <div style={{ borderRadius: 14, overflow: "hidden", marginBottom: 16, position: "relative" }}>
-          <img src="pour.jpg" alt="دبس التمر" style={{ width: "100%", height: 170, objectFit: "cover", display: "block" }} />
+          <img src="pour.jpeg" alt="دبس التمر" style={{ width: "100%", height: 170, objectFit: "cover", display: "block" }} />
           <span style={{ position: "absolute", top: 10, insetInlineStart: 10, background: "rgba(107,122,58,.92)", color: "#fff", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>
             🌿 ORGANIC
           </span>
@@ -468,7 +483,7 @@ function CustomerOrderForm() {
           <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep }}>تسجيل طلب دبس</div>
         </div>
         <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 14, lineHeight: 1.8 }}>
-          دبس تمر طبيعي 100٪ — بلا إضافات ولا مواد حافظة.
+          دبس تمر من نخيل المزرعة — مكوّن واحد فقط: التمر.
         </div>
         <a href="#story" style={{
           display: "block", textDecoration: "none", marginBottom: 18,
@@ -586,160 +601,260 @@ function CustomerOrderForm() {
 
 /* ============ صفحة قصة المنتج ============ */
 
+/* رسم توضيحي: المدبسة — الشمس، الغرفة المحكمة، الأنواط، وقطرات الدبس */
+function MadbasaIllustration() {
+  return (
+    <svg viewBox="0 0 400 300" style={{ width: "100%", display: "block", borderRadius: 18, background: "#2B1B12" }} role="img" aria-label="رسم توضيحي للمدبسة">
+      <defs>
+        <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#F5C563" stopOpacity="0.95" />
+          <stop offset="0.55" stopColor="#E09A34" stopOpacity="0.35" />
+          <stop offset="1" stopColor="#E09A34" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="heatGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#C87A2A" stopOpacity="0.34" />
+          <stop offset="1" stopColor="#C87A2A" stopOpacity="0.03" />
+        </linearGradient>
+        <linearGradient id="dropGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#E0A040" />
+          <stop offset="1" stopColor="#8F4E15" />
+        </linearGradient>
+      </defs>
+
+      {/* الشمس وهالتها */}
+      <circle cx="330" cy="52" r="72" fill="url(#sunGlow)" />
+      <circle cx="330" cy="52" r="21" fill="#F5C563" />
+      <g stroke="#F5C563" strokeWidth="2" strokeLinecap="round" opacity="0.75">
+        <path d="M330 18 L330 6" /><path d="M330 98 L330 110" />
+        <path d="M296 52 L284 52" /><path d="M364 52 L376 52" />
+        <path d="M306 28 L297 19" /><path d="M354 76 L363 85" />
+        <path d="M354 28 L363 19" /><path d="M306 76 L297 85" />
+      </g>
+
+      {/* أشعة تنزل على سقف الغرفة */}
+      <g stroke="#F5C563" strokeWidth="1.4" opacity="0.4" strokeLinecap="round">
+        <path d="M300 88 L246 132" /><path d="M322 96 L282 132" /><path d="M344 100 L318 132" />
+      </g>
+
+      {/* جسم الغرفة */}
+      <rect x="44" y="132" width="250" height="140" rx="8" fill="#3A2214" stroke="#C99B5A" strokeWidth="2" />
+      {/* السقف */}
+      <path d="M34 132 L169 74 L304 132 Z" fill="#4A2511" stroke="#C99B5A" strokeWidth="2" strokeLinejoin="round" />
+      {/* الحرارة المحتبسة داخل الغرفة */}
+      <rect x="52" y="140" width="234" height="124" rx="6" fill="url(#heatGrad)" />
+
+      {/* موجات الحرارة */}
+      <g stroke="#E0A040" strokeWidth="1.6" fill="none" opacity="0.5" strokeLinecap="round">
+        <path d="M86 168 q10 -9 20 0 t20 0" />
+        <path d="M206 162 q10 -9 20 0 t20 0" />
+        <path d="M140 152 q10 -9 20 0 t20 0" />
+      </g>
+
+      {/* الأنواط مكدّسة */}
+      <g fill="#B08A55" stroke="#7A5A32" strokeWidth="1.5">
+        <rect x="74" y="212" width="76" height="24" rx="12" />
+        <rect x="158" y="212" width="76" height="24" rx="12" />
+        <rect x="92" y="188" width="76" height="24" rx="12" />
+        <rect x="176" y="188" width="72" height="24" rx="12" />
+        <rect x="120" y="164" width="76" height="24" rx="12" />
+      </g>
+      {/* نسيج الخوص */}
+      <g stroke="#8C6B3E" strokeWidth="0.9" opacity="0.65">
+        <path d="M84 214 l10 20 M104 214 l10 20 M124 214 l10 20" />
+        <path d="M168 214 l10 20 M188 214 l10 20 M208 214 l10 20" />
+        <path d="M130 166 l10 20 M150 166 l10 20 M170 166 l10 20" />
+      </g>
+
+      {/* أرضية التجميع */}
+      <rect x="52" y="244" width="234" height="20" rx="4" fill="#241309" />
+      {/* الدبس المتجمّع */}
+      <rect x="60" y="252" width="218" height="9" rx="4" fill="#6B3A12" />
+      <rect x="60" y="252" width="218" height="4" rx="2" fill="#8F4E15" opacity="0.85" />
+
+      {/* قطرات الدبس */}
+      <g fill="url(#dropGrad)">
+        <path d="M112 238 c0 0 6 8 6 11 a6 6 0 0 1 -12 0 c0 -3 6 -11 6 -11 Z" />
+        <path d="M196 240 c0 0 5 7 5 9.5 a5 5 0 0 1 -10 0 c0 -2.5 5 -9.5 5 -9.5 Z" opacity="0.9" />
+        <path d="M154 246 c0 0 4 6 4 8 a4 4 0 0 1 -8 0 c0 -2 4 -8 4 -8 Z" opacity="0.8" />
+      </g>
+      {/* خيوط سيلان رفيعة */}
+      <g stroke="#A6641F" strokeWidth="1.6" strokeLinecap="round" opacity="0.8">
+        <path d="M112 236 L112 226" /><path d="M196 238 L196 230" /><path d="M154 244 L154 238" />
+      </g>
+    </svg>
+  );
+}
+
+
+
+/* كل مرحلة: صورتان متداخلتان + نص جانبي */
 const STORY_STEPS = [
   {
-    img: "palm.jpg",
-    kicker: "البداية",
-    title: "النخلة",
-    text: "بالمناطق الشرقية والشمالية من الدولة، يكبر صنف وحيد أصيل. نبدأ بالنخلة — عناية وتربة زينة وتلقيح بوقته، لين تكبر العذوق وتنضج تحت الشمس.",
+    a: "palm.jpeg", b: "dates.jpeg",
+    kicker: "الأصل",
+    title: "نخلة واحدة… وصنف واحد",
+    text: "بالمناطق الشرقية والشمالية من الدولة، يكبر صنف وحيد أصيل — ما نخلطه بغيره. سنة كاملة من العناية: إصلاح التربة، والتلقيح بوقته، والسقي بميزان. وبعدها ننتظر… يمر التمر بأطواره: بسر، فرطب، فتمر — لين يبدا الهمد وهو بعده على النخلة، ويتحول لونه للغامق.",
+    note: "١٢ شهراً من العناية قبل أول حبة",
   },
   {
-    img: "dates.jpg",
-    kicker: "الأطوار",
-    title: "من البسر… للهمد",
-    text: "يمر التمر بأطواره: بسر، رطب، تمر — ويبدا الهمد وهو بعده على النخلة، يتحول لونه للغامق. عندها يكون جاهزاً لليداد.",
-  },
-  {
-    img: "harvest.jpg",
+    a: "harvest.jpeg", b: "mastah.jpeg",
     kicker: "الحصاد",
     title: "اليـداد",
-    text: "تُقص العذوق بأيدي أهل الخبرة، وحدة وحدة، بعد اكتمال النضج تماماً — لا قبل ولا بعد.",
+    text: "ما فيه آلة تقدر تسويها. يطلع الرجّال النخلة بحبل وخبرة، تحت شمس تحرق، ويقص العذوق وحدة وحدة بعد اكتمال النضج تماماً — لا قبل ولا بعد. نخلة نخلة، وعذق عذق. من هني يروح التمر للمسطاح، يتروّح على الشمس أياماً كما كانوا يسوون الأولين.",
+    note: "بالأيدي وحدها — نخلة نخلة",
   },
   {
-    img: "mastah.jpg",
-    kicker: "المسطاح",
-    title: "الترويح",
-    text: "يُفرش التمر في المسطاح، مكشوفاً للشمس طول النهار، يتروّح ويجف على طبيعته — بلا أفران ولا تجفيف صناعي.",
-  },
-  {
-    img: "muntaqa.jpg",
+    a: "Massage.jpg.jpeg", b: "anwat.jpeg",
     kicker: "الانتقاء",
-    title: "المنتقى",
-    text: "بعد أيام نتنقى التمر الزين حبة حبة، والحشف نيمّعه للنفيعة. يقولون الأولين: «عمر الحشف ما نزل دبس» — فاقد الشي لا يعطيه. بعدها يُغسل، ويتروّح ثاني بادي.",
+    title: "المنتقى والأنـواط",
+    text: "أطول مرحلة وأصعبها. نتنقى التمر الزين حبة حبة، والحشف نيمّعه للنفيعة — ما نسمح لحبة وحدة تعدّي. يقولون الأولين: «عمر الحشف ما نزل دبس» — فاقد الشي لا يعطيه. يُغسل، ويتروّح ثاني بادي، ويُعبّى بالأنواط، أكياس مضفورة من سعف النخيل بأيادي الحرفيين.",
+    note: "حبة حبة — ما تعدّي وحدة",
   },
   {
-    img: "anwat.jpg",
-    kicker: "التعبئة",
-    title: "الأنـواط",
-    text: "يُعبّى التمر في الأنواط — أكياس مصنوعة من سعف النخيل، ويتقلّب بالمسطاح لين ياخذ كفايته من حرارة الشمس.",
-  },
-  {
-    img: "madbasa.jpg",
+    a: "madbasa.jpeg", b: "pour.jpeg",
     kicker: "السر",
     title: "المدبسة",
-    text: "من هني يدخل المدبسة. الحر والضغط يتصاعد فيها من الشمس، والدبس يسيل من التمر وحده… بلا عصر، ولا تدخّل، ولا حرارة صناعية.",
-  },
-  {
-    img: "pour.jpg",
-    kicker: "النتيجة",
-    title: "دبس خالص",
-    text: "يُجمع الدبس من كل مدبسة على حدة، ويُصفّى مرتين لضمان خلوّه من أي شوائب — بلونه الكهرماني وقوامه الصافي.",
-  },
-  {
-    img: "filling.jpg",
-    kicker: "التعبئة",
-    title: "جاهز لكم",
-    text: "ثم يُعبّأ بالمقاييس المتوارثة — المنّ والمنّين — ويصل إليكم كما خرج من المدبسة تماماً.",
+    text: "هني يصير الشغل كله. غرفة محكمة الإغلاق، عديمة التهوية، ترتفع حرارتها بأشعة الشمس. تكدّس الأنواط فوق بعض، وثقلها مع الحرارة تسيل قطرات الدبس على مدى الأيام. يُجمع من كل مدبسة على حدة، ثم يدخل خزان التعبئة.",
   },
 ];
 
 function StoryPage() {
   return (
     <div dir="rtl" style={{ background: COLORS.bg, minHeight: "100vh", color: COLORS.ink }}>
-      {/* الواجهة */}
-      <div style={{ position: "relative", minHeight: "72vh", overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
-        <img src="palm.jpg" alt="نخيل المزرعة"
+
+      {/* ===== واجهة مختصرة ===== */}
+      <div style={{ position: "relative", minHeight: "52vh", overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
+        <img src="pour.jpeg" alt="دبس تمر طبيعي"
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(43,27,18,.96) 8%, rgba(43,27,18,.55) 55%, rgba(43,27,18,.25) 100%)" }} />
-        <div style={{ position: "relative", padding: "0 22px 46px", width: "100%", maxWidth: 760, margin: "0 auto" }}>
-          <div style={{ marginBottom: 22 }}>
-            <LogoLockup size={58} light />
-          </div>
-          <span style={{ display: "inline-block", background: "rgba(107,122,58,.9)", color: "#fff", borderRadius: 20, padding: "5px 14px", fontSize: 11.5, fontWeight: 800, letterSpacing: 1, marginBottom: 14 }}>
-            🌿 ORGANIC
-          </span>
-          <h1 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 38, lineHeight: 1.3, color: "#FBF6EC", margin: "0 0 12px" }}>
-            من النخلة…<br />للمدبسة
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(43,27,18,.95) 10%, rgba(43,27,18,.4) 60%, rgba(43,27,18,.2) 100%)" }} />
+        <div style={{ position: "relative", padding: "0 22px 38px", width: "100%", maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ marginBottom: 18 }}><LogoLockup size={50} light /></div>
+          <h1 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 32, lineHeight: 1.3, color: "#FBF6EC", margin: "0 0 12px" }}>
+            الدبس الكهرماني<br />مستخلص بطرق أسلافنا
           </h1>
-          <p style={{ fontSize: 15, color: "#E3D3BB", lineHeight: 2, margin: 0, maxWidth: 520 }}>
-            دبس تمر طبيعي 100٪، يسيل من التمر وحده تحت حرارة الشمس —
-            بلا عصر، ولا إضافات، ولا مواد حافظة.
+          <p style={{ fontSize: 14.5, color: "#E3D3BB", lineHeight: 1.95, margin: 0, maxWidth: 480 }}>
+            من نخيل المزرعة، بموسم واحد في السنة.
           </p>
         </div>
       </div>
 
-      {/* المراحل */}
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "10px 18px 20px" }}>
+      {/* ===== الإرث ===== */}
+      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "38px 20px" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
+          <div style={{ fontSize: 30, marginBottom: 16 }}>🌴</div>
+          <p style={{ fontSize: 15.5, lineHeight: 2.3, margin: "0 0 22px", color: "#E3D3BB" }}>
+            قبل الكهرباء، وقبل المصانع، عرف أهلنا أن الشمس تكفي.
+            كانوا يطلعون النخلة بحبل، ويفرشون التمر على المسطاح، وينتظرون…
+            لأنهم يعرفون أن الطيب ما يجي بالاستعجال.
+          </p>
+          <p style={{ fontSize: 15.5, lineHeight: 2.3, margin: 0, color: "#E3D3BB" }}>
+            ورثنا الطريقة كما هي، وما غيّرنا فيها حرف —
+            <br />
+            <b style={{ color: "#FBF6EC" }}>غيّرنا الأدوات فقط، حفاظاً على النظافة والدقة.</b>
+          </p>
+          <div style={{ height: 1, background: "rgba(243,233,216,.22)", margin: "26px auto", maxWidth: 180 }} />
+          <div style={{ fontSize: 13, color: "#C9B393", lineHeight: 2 }}>
+            كل علبة تمر عليها: عام من العناية · شهور من الشمس · وأيادٍ لا تعرف الاختصار
+          </div>
+        </div>
+      </div>
+
+      {/* ===== المراحل ===== */}
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 20px 20px" }}>
         {STORY_STEPS.map((s, i) => (
-          <div key={s.img} style={{ margin: "44px 0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 20, flex: "0 0 auto",
-                background: COLORS.deep, color: "#F3E9D8", display: "flex",
-                alignItems: "center", justifyContent: "center",
-                fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16,
-              }}>{i + 1}</div>
-              <div>
-                <div style={{ fontSize: 11.5, color: COLORS.primary, fontWeight: 800, letterSpacing: 1 }}>{s.kicker}</div>
-                <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22, color: COLORS.deep, lineHeight: 1.4 }}>{s.title}</div>
+          <React.Fragment key={s.a}>
+            {i === 3 && (
+              <div style={{ margin: "0 0 60px" }}>
+                <MadbasaIllustration />
+                <div style={{ textAlign: "center", fontSize: 12.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.9 }}>
+                  الشمس ترفع حرارة الغرفة · ثقل الأنواط يعصر التمر بنفسه · الدبس ينزل قطرة قطرة
+                </div>
+              </div>
+            )}
+            <div className={"st-row" + (i % 2 ? " rev" : "")}>
+            <div className="st-media">
+              <div className="st-stack">
+                <img className="st-img-a" src={s.a} alt={s.title} loading="lazy" />
+                <img className="st-img-b" src={s.b} alt={s.title} loading="lazy" />
               </div>
             </div>
-            <div style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 14px 34px rgba(74,37,17,.16)", marginBottom: 16 }}>
-              <img src={s.img} alt={s.title} loading="lazy"
-                style={{ width: "100%", height: 300, objectFit: "cover", display: "block" }} />
+            <div>
+              <div className="st-num">{"0" + (i + 1)}</div>
+              <div style={{ fontSize: 11.5, color: COLORS.primary, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>
+                {s.kicker}
+              </div>
+              <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 25, color: COLORS.deep, margin: "0 0 12px", lineHeight: 1.35 }}>
+                {s.title}
+              </h2>
+              <p style={{ fontSize: 14.5, lineHeight: 2.1, color: COLORS.inkSoft, margin: 0 }}>{s.text}</p>
+              {s.note && (
+                <div style={{
+                  display: "inline-block", marginTop: 16, background: COLORS.amberLight,
+                  color: COLORS.deep, borderRadius: 20, padding: "7px 16px",
+                  fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
+                }}>
+                  {s.note}
+                </div>
+              )}
             </div>
-            <p style={{ fontSize: 14.5, lineHeight: 2.1, color: COLORS.inkSoft, margin: 0 }}>{s.text}</p>
           </div>
+          </React.Fragment>
         ))}
       </div>
 
-      {/* المدبسة: طابع قديم بأدوات جديدة */}
-      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "42px 20px", textAlign: "center" }}>
-        <div style={{ maxWidth: 620, margin: "0 auto" }}>
-          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22, marginBottom: 12 }}>
-            طابع قديم… بأدوات جديدة
+      {/* ===== التعبئة ===== */}
+      <div style={{ background: COLORS.amberLight, padding: "46px 20px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <div className="st-row">
+            <div className="st-media">
+              <img src="filling.jpeg" alt="تعبئة الدبس" loading="lazy"
+                style={{ width: "100%", borderRadius: 18, boxShadow: "0 18px 40px rgba(74,37,17,.22)", objectFit: "cover", aspectRatio: "4/3" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: COLORS.primary, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>التعبئة</div>
+              <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 25, color: COLORS.deep, margin: "0 0 12px" }}>
+                بالمنّ… كما عرفوه
+              </h2>
+              <p style={{ fontSize: 14.5, lineHeight: 2.1, color: COLORS.inkSoft, margin: "0 0 18px" }}>
+                يُعبّأ بالمقاييس المتوارثة في المنطقة، ويصل إليكم كما خرج من المدبسة تماماً.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[{ n: "المنّ", kg: BOX_SIZE_KG, price: DEFAULT_BOX_PRICE }, { n: "المنّين", kg: BOX_SIZE_KG * 2, price: DEFAULT_BOX_PRICE * 2 }].map((m) => (
+                  <div key={m.n} style={{ background: "#fff", border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: "16px 12px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19, color: COLORS.deep }}>{m.n}</div>
+                    <div style={{ fontSize: 12, color: COLORS.inkSoft, margin: "4px 0 8px" }}>{m.kg} كيلو</div>
+                    <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16, color: COLORS.primary }}>{m.price} درهم</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <p style={{ fontSize: 14.5, lineHeight: 2.1, color: "#D8C4A8", margin: 0 }}>
-            مدبستنا مصمّمة بعناية لتجمع بين طريقة الأولين وبين الدقة والنظافة —
-            بلا هدر وقت، وبلا مساس بطبيعة المنتج.
+        </div>
+      </div>
+
+      {/* ===== الخاتمة ===== */}
+      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "50px 20px" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
+          <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 24, margin: "0 0 16px", lineHeight: 1.5 }}>
+            ليش ما نستعجل؟
+          </h2>
+          <p style={{ fontSize: 15, lineHeight: 2.3, color: "#E3D3BB", margin: 0 }}>
+            الكمية محدودة، لأنها مربوطة بموسم واحد في السنة.
+            والوقت اللي تاخذه المدبسة ما نقدر نختصره — لو استعجلنا، يتغير الطعم.
+            <br /><br />
+            <b style={{ color: "#FBF6EC" }}>
+              نفضّل ننتج أقل، ويطلع الدبس كما عرفناه من أهلنا.
+            </b>
           </p>
         </div>
       </div>
 
-      {/* المنّ والمنّين */}
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "40px 18px 10px" }}>
-        <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 20, color: COLORS.deep, marginBottom: 6, textAlign: "center" }}>
-          كما عرفه أهل المنطقة
+      {/* ===== المختبر + الطلب ===== */}
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px 60px", textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: COLORS.inkSoft, lineHeight: 2, marginBottom: 26 }}>
+          🧪 جارٍ تجهيز عيّنات لإرسالها إلى المختبرات الغذائية المعتمدة لتوثيق القيمة الغذائية — وسنشارككم النتائج فور صدورها.
         </div>
-        <p style={{ fontSize: 13.5, color: COLORS.inkSoft, textAlign: "center", marginBottom: 20, lineHeight: 2 }}>
-          يُعبّأ الدبس بالمقاييس المتوارثة في المنطقة
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          {[{ n: "المنّ", kg: BOX_SIZE_KG, price: DEFAULT_BOX_PRICE }, { n: "المنّين", kg: BOX_SIZE_KG * 2, price: DEFAULT_BOX_PRICE * 2 }].map((m) => (
-            <div key={m.n} style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 16, padding: "20px 16px", textAlign: "center" }}>
-              <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22, color: COLORS.deep }}>{m.n}</div>
-              <div style={{ fontSize: 13, color: COLORS.inkSoft, margin: "6px 0 10px" }}>{m.kg} كيلو دبس</div>
-              <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.primary }}>{m.price} درهم</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* شهادة المختبر */}
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 18px 0" }}>
-        <div style={{ background: COLORS.amberLight, borderRadius: 16, padding: "18px 20px", display: "flex", gap: 12, alignItems: "flex-start" }}>
-          <span style={{ fontSize: 20 }}>🧪</span>
-          <div style={{ fontSize: 13.5, color: COLORS.deep, lineHeight: 2 }}>
-            <b>القيمة الغذائية</b><br />
-            جارٍ تجهيز عيّنات من إنتاجنا لإرسالها إلى المختبرات الغذائية المعتمدة،
-            لتوثيق القيمة الغذائية للمنتج وطبيعته الخالصة — وسنشارككم النتائج فور صدورها.
-          </div>
-        </div>
-      </div>
-
-      {/* دعوة للطلب */}
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "30px 18px 60px", textAlign: "center" }}>
-        <a href="#order" style={{ ...primaryBtnStyle, display: "inline-block", textDecoration: "none", padding: "14px 40px", fontSize: 15, borderRadius: 12 }}>
+        <a href="#order" style={{ ...primaryBtnStyle, display: "inline-block", textDecoration: "none", padding: "15px 46px", fontSize: 15.5, borderRadius: 12 }}>
           اطلب الآن
         </a>
       </div>
