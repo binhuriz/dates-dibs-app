@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>نظام إدارة التمر والدبس</title>
+<title>المدبسة — دبس تمر طبيعي</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 14C50 14 76 45 76 62A26 26 0 0 1 24 62C24 45 50 14 50 14Z' fill='%23B5651D'/%3E%3Cg stroke='%23F3E3C8' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M50 78L50 42'/%3E%3Cpath d='M50 48C43 42 37 42 32 46'/%3E%3Cpath d='M50 48C57 42 63 42 68 46'/%3E%3Cpath d='M50 58C42 52 35 53 30 58'/%3E%3Cpath d='M50 58C58 52 65 53 70 58'/%3E%3Cpath d='M50 68C43 63 37 64 33 69'/%3E%3Cpath d='M50 68C57 63 63 64 67 69'/%3E%3C/g%3E%3C/svg%3E" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" />
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
-   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script><style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
+<style>
   * { box-sizing: border-box; }
   body { margin: 0; font-family: Tajawal, sans-serif; }
   table { border-collapse: collapse; width: 100%; }
@@ -58,6 +60,8 @@ const primaryBtnStyle = { padding: "9px 16px", borderRadius: 9, border: "none", 
 const ghostBtnStyle = { padding: "9px 16px", borderRadius: 9, border: `1px solid ${COLORS.line}`, background: "#fff", color: COLORS.inkSoft, fontWeight: 600, fontSize: 13, cursor: "pointer" };
 const dangerBtnStyle = { padding: "6px 10px", borderRadius: 8, border: "none", background: "transparent", color: COLORS.alert, fontWeight: 600, fontSize: 12.5, cursor: "pointer" };
 
+const BRAND_NAME = "المدبسة";
+const BRAND_TAGLINE = "دبس تمر طبيعي";
 const DEFAULT_BOX_PRICE = 150;
 const BOX_SIZE_KG = 4;
 const SOURCE_OPTIONS = ["إنتاج المزرعة", "تمور مشتراة"];
@@ -273,6 +277,61 @@ function computeDash(rows) {
   };
 }
 
+/* ============ اللوجو ============ */
+
+function LogoMark({ size = 56, light = false }) {
+  const id = "g" + size + (light ? "l" : "d");
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="50" y1="14" x2="50" y2="90" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#C87A2A" />
+          <stop offset="0.5" stopColor="#B5651D" />
+          <stop offset="1" stopColor="#4A2511" />
+        </linearGradient>
+      </defs>
+
+      {/* حلقة خارجية */}
+      <circle cx="50" cy="50" r="47" stroke={light ? "rgba(243,233,216,.45)" : "#C99B5A"} strokeWidth="1.5" opacity="0.75" />
+
+      {/* قطرة الدبس */}
+      <path
+        d="M50 14 C50 14 76 45 76 62 A26 26 0 0 1 24 62 C24 45 50 14 50 14 Z"
+        fill={`url(#${id})`}
+      />
+
+      {/* سعفة النخيل داخل القطرة */}
+      <g stroke={light ? "#FBF6EC" : "#F3E3C8"} strokeWidth="2.4" strokeLinecap="round" opacity="0.95">
+        <path d="M50 78 L50 42" />
+        <path d="M50 47 C43 41 37 41 32 45" />
+        <path d="M50 47 C57 41 63 41 68 45" />
+        <path d="M50 56 C42 50 35 51 30 56" />
+        <path d="M50 56 C58 50 65 51 70 56" />
+        <path d="M50 65 C43 60 37 61 33 66" />
+        <path d="M50 65 C57 60 63 61 67 66" />
+      </g>
+    </svg>
+  );
+}
+
+function LogoLockup({ size = 52, light = false, center = false }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: center ? "center" : "flex-start" }}>
+      <LogoMark size={size} light={light} />
+      <div>
+        <div style={{
+          fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: size * 0.42,
+          color: light ? "#FBF6EC" : COLORS.deep, lineHeight: 1.2, letterSpacing: 0.5,
+        }}>{BRAND_NAME}</div>
+        <div style={{
+          fontSize: size * 0.22, color: light ? "#D8C4A8" : COLORS.inkSoft,
+          marginTop: 2, letterSpacing: 1,
+        }}>{BRAND_TAGLINE}</div>
+      </div>
+    </div>
+  );
+}
+
 /* ============ تسجيل الدخول ============ */
 function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -291,7 +350,9 @@ function LoginScreen() {
   return (
     <div dir="rtl" style={{ minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ maxWidth: 380, width: "100%", background: COLORS.surface, borderRadius: 18, padding: 28, border: `1px solid ${COLORS.line}` }}>
-        <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19, color: COLORS.deep, marginBottom: 4 }}>نظام إدارة التمر والدبس</div>
+        <div style={{ marginBottom: 20 }}>
+          <LogoLockup size={54} />
+        </div>
         <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 20 }}>تسجيل دخول صاحب النظام</div>
         <form onSubmit={submit}>
           <div style={{ display: "grid", gap: 12 }}>
@@ -309,50 +370,210 @@ function LoginScreen() {
 }
 
 /* ============ نموذج طلب العميل العام (بدون تسجيل دخول) ============ */
+
+const EMIRATES = ["رأس الخيمة", "أبوظبي", "دبي", "الشارقة", "عجمان", "أم القيوين", "الفجيرة"];
+
 function CustomerOrderForm() {
-  const [form, setForm] = useState({ name: "", phone: "", qty: "", notes: "" });
+  const [form, setForm] = useState({
+    first_name: "", last_name: "", phone: "", qty: "",
+    fulfillment: "استلام", emirate: "", area: "", delivery_location: "", house_number: "", notes: "",
+  });
   const [status, setStatus] = useState("idle");
+  const [errMsg, setErrMsg] = useState("");
+  const [ordersOpen, setOrdersOpen] = useState(null);
+  const [fees, setFees] = useState({ rak: 30, other: 60 });
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("settings").select("key,value").in("key", ["orders_open", "delivery_fee_rak", "delivery_fee_other"]);
+      let open = true, rak = 30, other = 60;
+      (data || []).forEach((r) => {
+        if (r.key === "orders_open") open = r.value !== false && r.value !== "false";
+        if (r.key === "delivery_fee_rak") rak = num(r.value);
+        if (r.key === "delivery_fee_other") other = num(r.value);
+      });
+      setFees({ rak: rak || 30, other: other || 60 });
+      setOrdersOpen(open);
+    })();
+  }, []);
+
+  const deliveryFee = form.fulfillment !== "توصيل" ? 0
+    : form.emirate === "رأس الخيمة" ? fees.rak
+    : form.emirate ? fees.other : 0;
+  const boxesTotal = num(form.qty) * DEFAULT_BOX_PRICE;
+  const grandTotal = boxesTotal + deliveryFee;
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.qty) return;
+    if (!form.first_name.trim() || !form.qty) return;
     setStatus("saving");
     try {
-      await supabase.from("incoming_orders").insert({ name: form.name, phone: form.phone, qty: num(form.qty), notes: form.notes });
+      const payload = {
+        name: `${form.first_name} ${form.last_name}`.trim(),
+        first_name: form.first_name, last_name: form.last_name,
+        phone: form.phone, qty: num(form.qty), notes: form.notes,
+        fulfillment: form.fulfillment, delivery_fee: deliveryFee,
+      };
+      if (form.fulfillment === "توصيل") {
+        payload.emirate = form.emirate;
+        payload.area = form.area;
+        payload.delivery_location = form.delivery_location;
+        payload.house_number = form.house_number;
+      }
+      const { error } = await supabase.from("incoming_orders").insert(payload);
+      if (error) { console.error(error); setErrMsg(error.message || "تعذّر إرسال الطلب"); setStatus("error"); return; }
       setStatus("done");
     } catch (err) {
-      console.error(err); setStatus("error");
+      console.error(err); setErrMsg(String(err && err.message ? err.message : err)); setStatus("error");
     }
   };
 
+  const card = { maxWidth: 460, width: "100%", background: COLORS.surface, borderRadius: 18, padding: 24, border: `1px solid ${COLORS.line}` };
+  const wrap = { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
+
+  if (ordersOpen === null) {
+    return <div dir="rtl" style={wrap}><div style={{ color: COLORS.inkSoft }}>جارٍ التحميل…</div></div>;
+  }
+
+  if (!ordersOpen) {
+    return (
+      <div dir="rtl" style={wrap}>
+        <div style={{ ...card, textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🌴</div>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep, marginBottom: 8 }}>
+            نفذت الكمية حالياً
+          </div>
+          <div style={{ fontSize: 13.5, color: COLORS.inkSoft, lineHeight: 1.9 }}>
+            نعتذر، استقبال الطلبات متوقف مؤقتاً لحين توفر إنتاج جديد.
+            <br />نشكر لكم اهتمامكم، وسنستقبل طلباتكم فور توفر الكمية بإذن الله.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div dir="rtl" style={{ minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ maxWidth: 420, width: "100%", background: COLORS.surface, borderRadius: 18, padding: 24, border: `1px solid ${COLORS.line}` }}>
-        <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep, marginBottom: 18 }}>تسجيل طلب دبس جديد</div>
+    <div dir="rtl" style={wrap}>
+      <div style={card}>
+        <div style={{ marginBottom: 16 }}>
+          <LogoLockup size={50} center />
+        </div>
+        <div style={{ borderRadius: 14, overflow: "hidden", marginBottom: 16, position: "relative" }}>
+          <img src="pour.jpg" alt="دبس التمر" style={{ width: "100%", height: 170, objectFit: "cover", display: "block" }} />
+          <span style={{ position: "absolute", top: 10, insetInlineStart: 10, background: "rgba(107,122,58,.92)", color: "#fff", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>
+            🌿 ORGANIC
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep }}>تسجيل طلب دبس</div>
+        </div>
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 14, lineHeight: 1.8 }}>
+          دبس تمر طبيعي 100٪ — بلا إضافات ولا مواد حافظة.
+        </div>
+        <a href="#story" style={{
+          display: "block", textDecoration: "none", marginBottom: 18,
+          background: COLORS.amberLight, borderRadius: 12, padding: "10px 14px",
+          fontSize: 12.5, color: COLORS.deep, fontWeight: 700,
+        }}>
+          🌴 تعرّف على رحلة المنتج — من النخلة للمدبسة ←
+        </a>
+
         {status === "done" ? (
           <div style={{ textAlign: "center", padding: "24px 8px" }}>
             <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
             <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 700, fontSize: 16, color: COLORS.deep }}>تم استلام طلبك بنجاح</div>
-            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6 }}>سيتم التواصل معك قريباً بخصوص التسليم.</div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.9 }}>
+              سيتم التواصل معك لتأكيد الطلب، وتحديد موعد التسليم حسب توفر الإنتاج.
+            </div>
           </div>
         ) : (
           <form onSubmit={submit}>
             <div style={{ display: "grid", gap: 12 }}>
-              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>الاسم
-                <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>الاسم
+                  <input required value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                </label>
+                <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>اللقب
+                  <input value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                </label>
+              </div>
+
+              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>رقم التواصل (واتساب)
+                <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="مثال: 0501234567" style={{ ...inputStyle, marginTop: 4 }} />
               </label>
-              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>رقم الجوال (اختياري)
-                <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
-              </label>
-              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>الكمية المطلوبة (عدد علب الدبس)
+
+              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>الكمية المطلوبة (عدد العلب)
                 <input required type="number" min="1" value={form.qty} onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
               </label>
-              <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>العلبة الواحدة {BOX_SIZE_KG} كجم دبس بسعر {DEFAULT_BOX_PRICE} درهم.</div>
+              <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>العلبة الواحدة {BOX_SIZE_KG} كجم (منّ) بسعر {DEFAULT_BOX_PRICE} درهم.</div>
+
+              <div>
+                <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 6 }}>طريقة الاستلام</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {["استلام", "توصيل"].map((opt) => (
+                    <button key={opt} type="button" onClick={() => setForm((f) => ({ ...f, fulfillment: opt }))}
+                      style={{
+                        padding: "10px 8px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700,
+                        border: `1px solid ${form.fulfillment === opt ? COLORS.primary : COLORS.line}`,
+                        background: form.fulfillment === opt ? COLORS.primary : "#fff",
+                        color: form.fulfillment === opt ? "#fff" : COLORS.inkSoft,
+                      }}>
+                      {opt === "استلام" ? "🏠 استلام من المزرعة" : "🚚 توصيل"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {form.fulfillment === "توصيل" && (
+                <div style={{ display: "grid", gap: 10, background: COLORS.amberLight, padding: 12, borderRadius: 12 }}>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>الإمارة
+                    <select required value={form.emirate} onChange={(e) => setForm((f) => ({ ...f, emirate: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }}>
+                      <option value="">— اختر —</option>
+                      {EMIRATES.map((em) => <option key={em} value={em}>{em}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>المنطقة
+                    <input required value={form.area} onChange={(e) => setForm((f) => ({ ...f, area: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>رقم المنزل / الفيلا
+                    <input required value={form.house_number} onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>وصف الموقع أو رابط الموقع (اختياري)
+                    <input value={form.delivery_location} onChange={(e) => setForm((f) => ({ ...f, delivery_location: e.target.value }))} placeholder="رابط خرائط جوجل أو وصف" style={{ ...inputStyle, marginTop: 4 }} />
+                  </label>
+                  {form.emirate && (
+                    <div style={{ fontSize: 12, color: COLORS.deep, fontWeight: 700 }}>
+                      رسوم التوصيل: {fmt(deliveryFee)} درهم
+                    </div>
+                  )}
+                </div>
+              )}
+
               <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>ملاحظات (اختياري)
                 <input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
               </label>
+
+              {num(form.qty) > 0 && (
+                <div style={{ background: "#fff", border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: 12, fontSize: 13 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ color: COLORS.inkSoft }}>{fmt(num(form.qty))} علبة × {DEFAULT_BOX_PRICE}</span>
+                    <span>{fmt(boxesTotal)}</span>
+                  </div>
+                  {deliveryFee > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ color: COLORS.inkSoft }}>رسوم التوصيل</span>
+                      <span>{fmt(deliveryFee)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${COLORS.line}`, paddingTop: 6, marginTop: 6, fontWeight: 800, color: COLORS.deep }}>
+                    <span>الإجمالي</span>
+                    <span>{fmt(grandTotal)} درهم</span>
+                  </div>
+                </div>
+              )}
             </div>
-            {status === "error" && <div style={{ color: COLORS.alert, fontSize: 12.5, marginTop: 10 }}>حدث خطأ، حاول مرة أخرى.</div>}
+
+            {status === "error" && <div style={{ color: COLORS.alert, fontSize: 12.5, marginTop: 10 }}>{errMsg || "حدث خطأ، حاول مرة أخرى."}</div>}
             <button type="submit" disabled={status === "saving"} style={{ ...primaryBtnStyle, width: "100%", marginTop: 16, padding: "11px 16px" }}>
               {status === "saving" ? "جارٍ الإرسال…" : "إرسال الطلب"}
             </button>
@@ -363,11 +584,175 @@ function CustomerOrderForm() {
   );
 }
 
+/* ============ صفحة قصة المنتج ============ */
+
+const STORY_STEPS = [
+  {
+    img: "palm.jpg",
+    kicker: "البداية",
+    title: "النخلة",
+    text: "بالمناطق الشرقية والشمالية من الدولة، يكبر صنف وحيد أصيل. نبدأ بالنخلة — عناية وتربة زينة وتلقيح بوقته، لين تكبر العذوق وتنضج تحت الشمس.",
+  },
+  {
+    img: "dates.jpg",
+    kicker: "الأطوار",
+    title: "من البسر… للهمد",
+    text: "يمر التمر بأطواره: بسر، رطب، تمر — ويبدا الهمد وهو بعده على النخلة، يتحول لونه للغامق. عندها يكون جاهزاً لليداد.",
+  },
+  {
+    img: "harvest.jpg",
+    kicker: "الحصاد",
+    title: "اليـداد",
+    text: "تُقص العذوق بأيدي أهل الخبرة، وحدة وحدة، بعد اكتمال النضج تماماً — لا قبل ولا بعد.",
+  },
+  {
+    img: "mastah.jpg",
+    kicker: "المسطاح",
+    title: "الترويح",
+    text: "يُفرش التمر في المسطاح، مكشوفاً للشمس طول النهار، يتروّح ويجف على طبيعته — بلا أفران ولا تجفيف صناعي.",
+  },
+  {
+    img: "muntaqa.jpg",
+    kicker: "الانتقاء",
+    title: "المنتقى",
+    text: "بعد أيام نتنقى التمر الزين حبة حبة، والحشف نيمّعه للنفيعة. يقولون الأولين: «عمر الحشف ما نزل دبس» — فاقد الشي لا يعطيه. بعدها يُغسل، ويتروّح ثاني بادي.",
+  },
+  {
+    img: "anwat.jpg",
+    kicker: "التعبئة",
+    title: "الأنـواط",
+    text: "يُعبّى التمر في الأنواط — أكياس مصنوعة من سعف النخيل، ويتقلّب بالمسطاح لين ياخذ كفايته من حرارة الشمس.",
+  },
+  {
+    img: "madbasa.jpg",
+    kicker: "السر",
+    title: "المدبسة",
+    text: "من هني يدخل المدبسة. الحر والضغط يتصاعد فيها من الشمس، والدبس يسيل من التمر وحده… بلا عصر، ولا تدخّل، ولا حرارة صناعية.",
+  },
+  {
+    img: "pour.jpg",
+    kicker: "النتيجة",
+    title: "دبس خالص",
+    text: "يُجمع الدبس من كل مدبسة على حدة، ويُصفّى مرتين لضمان خلوّه من أي شوائب — بلونه الكهرماني وقوامه الصافي.",
+  },
+  {
+    img: "filling.jpg",
+    kicker: "التعبئة",
+    title: "جاهز لكم",
+    text: "ثم يُعبّأ بالمقاييس المتوارثة — المنّ والمنّين — ويصل إليكم كما خرج من المدبسة تماماً.",
+  },
+];
+
+function StoryPage() {
+  return (
+    <div dir="rtl" style={{ background: COLORS.bg, minHeight: "100vh", color: COLORS.ink }}>
+      {/* الواجهة */}
+      <div style={{ position: "relative", minHeight: "72vh", overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
+        <img src="palm.jpg" alt="نخيل المزرعة"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(43,27,18,.96) 8%, rgba(43,27,18,.55) 55%, rgba(43,27,18,.25) 100%)" }} />
+        <div style={{ position: "relative", padding: "0 22px 46px", width: "100%", maxWidth: 760, margin: "0 auto" }}>
+          <div style={{ marginBottom: 22 }}>
+            <LogoLockup size={58} light />
+          </div>
+          <span style={{ display: "inline-block", background: "rgba(107,122,58,.9)", color: "#fff", borderRadius: 20, padding: "5px 14px", fontSize: 11.5, fontWeight: 800, letterSpacing: 1, marginBottom: 14 }}>
+            🌿 ORGANIC
+          </span>
+          <h1 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 38, lineHeight: 1.3, color: "#FBF6EC", margin: "0 0 12px" }}>
+            من النخلة…<br />للمدبسة
+          </h1>
+          <p style={{ fontSize: 15, color: "#E3D3BB", lineHeight: 2, margin: 0, maxWidth: 520 }}>
+            دبس تمر طبيعي 100٪، يسيل من التمر وحده تحت حرارة الشمس —
+            بلا عصر، ولا إضافات، ولا مواد حافظة.
+          </p>
+        </div>
+      </div>
+
+      {/* المراحل */}
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "10px 18px 20px" }}>
+        {STORY_STEPS.map((s, i) => (
+          <div key={s.img} style={{ margin: "44px 0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 20, flex: "0 0 auto",
+                background: COLORS.deep, color: "#F3E9D8", display: "flex",
+                alignItems: "center", justifyContent: "center",
+                fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16,
+              }}>{i + 1}</div>
+              <div>
+                <div style={{ fontSize: 11.5, color: COLORS.primary, fontWeight: 800, letterSpacing: 1 }}>{s.kicker}</div>
+                <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22, color: COLORS.deep, lineHeight: 1.4 }}>{s.title}</div>
+              </div>
+            </div>
+            <div style={{ borderRadius: 18, overflow: "hidden", boxShadow: "0 14px 34px rgba(74,37,17,.16)", marginBottom: 16 }}>
+              <img src={s.img} alt={s.title} loading="lazy"
+                style={{ width: "100%", height: 300, objectFit: "cover", display: "block" }} />
+            </div>
+            <p style={{ fontSize: 14.5, lineHeight: 2.1, color: COLORS.inkSoft, margin: 0 }}>{s.text}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* المدبسة: طابع قديم بأدوات جديدة */}
+      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "42px 20px", textAlign: "center" }}>
+        <div style={{ maxWidth: 620, margin: "0 auto" }}>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22, marginBottom: 12 }}>
+            طابع قديم… بأدوات جديدة
+          </div>
+          <p style={{ fontSize: 14.5, lineHeight: 2.1, color: "#D8C4A8", margin: 0 }}>
+            مدبستنا مصمّمة بعناية لتجمع بين طريقة الأولين وبين الدقة والنظافة —
+            بلا هدر وقت، وبلا مساس بطبيعة المنتج.
+          </p>
+        </div>
+      </div>
+
+      {/* المنّ والمنّين */}
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "40px 18px 10px" }}>
+        <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 20, color: COLORS.deep, marginBottom: 6, textAlign: "center" }}>
+          كما عرفه أهل المنطقة
+        </div>
+        <p style={{ fontSize: 13.5, color: COLORS.inkSoft, textAlign: "center", marginBottom: 20, lineHeight: 2 }}>
+          يُعبّأ الدبس بالمقاييس المتوارثة في المنطقة
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          {[{ n: "المنّ", kg: BOX_SIZE_KG, price: DEFAULT_BOX_PRICE }, { n: "المنّين", kg: BOX_SIZE_KG * 2, price: DEFAULT_BOX_PRICE * 2 }].map((m) => (
+            <div key={m.n} style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 16, padding: "20px 16px", textAlign: "center" }}>
+              <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22, color: COLORS.deep }}>{m.n}</div>
+              <div style={{ fontSize: 13, color: COLORS.inkSoft, margin: "6px 0 10px" }}>{m.kg} كيلو دبس</div>
+              <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.primary }}>{m.price} درهم</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* شهادة المختبر */}
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "28px 18px 0" }}>
+        <div style={{ background: COLORS.amberLight, borderRadius: 16, padding: "18px 20px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <span style={{ fontSize: 20 }}>🧪</span>
+          <div style={{ fontSize: 13.5, color: COLORS.deep, lineHeight: 2 }}>
+            <b>القيمة الغذائية</b><br />
+            جارٍ تجهيز عيّنات من إنتاجنا لإرسالها إلى المختبرات الغذائية المعتمدة،
+            لتوثيق القيمة الغذائية للمنتج وطبيعته الخالصة — وسنشارككم النتائج فور صدورها.
+          </div>
+        </div>
+      </div>
+
+      {/* دعوة للطلب */}
+      <div style={{ maxWidth: 760, margin: "0 auto", padding: "30px 18px 60px", textAlign: "center" }}>
+        <a href="#order" style={{ ...primaryBtnStyle, display: "inline-block", textDecoration: "none", padding: "14px 40px", fontSize: 15, borderRadius: 12 }}>
+          اطلب الآن
+        </a>
+      </div>
+    </div>
+  );
+}
+
 /* ============ التطبيق الرئيسي (بعد تسجيل الدخول) ============ */
 function MainApp({ session }) {
   const [tab, setTab] = useState("dashboard");
   const [data, setData] = useState({ bags: [], boxes: [], purchases: [], orders: [], sales: [], nafia: [], gifts: [], costs: [], withdrawals: [], partners: [] });
   const [incoming, setIncoming] = useState([]);
+  const [ordersOpen, setOrdersOpen] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState(null);
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); }, []);
@@ -387,8 +772,17 @@ function MainApp({ session }) {
     setData(next);
     const { data: inc } = await supabase.from("incoming_orders").select("*").eq("status", "pending").order("submitted_at", { ascending: true });
     setIncoming(inc || []);
+    const openVal = await getSetting("orders_open", true);
+    setOrdersOpen(openVal !== false && openVal !== "false");
     setLoaded(true);
   }, []);
+
+  const toggleOrders = async () => {
+    const next = !ordersOpen;
+    await setSetting("orders_open", next);
+    setOrdersOpen(next);
+    showToast(next ? "تم فتح استقبال الطلبات" : "تم إيقاف استقبال الطلبات");
+  };
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -421,6 +815,13 @@ function MainApp({ session }) {
     const notesParts = [];
     if (item.notes) notesParts.push(item.notes);
     if (item.phone) notesParts.push(`هاتف: ${item.phone}`);
+    notesParts.push(item.fulfillment === "توصيل" ? "توصيل" : "استلام");
+    if (item.fulfillment === "توصيل") {
+      const addr = [item.emirate, item.area, item.house_number ? `منزل ${item.house_number}` : "", item.delivery_location]
+        .filter(Boolean).join(" - ");
+      if (addr) notesParts.push(addr);
+      if (num(item.delivery_fee) > 0) notesParts.push(`رسوم توصيل: ${fmt(num(item.delivery_fee))}`);
+    }
     notesParts.push("(عبر الرابط الإلكتروني)");
     await insertRow("orders", { order_date: todayISO(), customer_name: item.name, qty_requested: item.qty, notes: notesParts.join(" — ") });
     await supabase.from("incoming_orders").update({ status: "accepted" }).eq("id", item.id);
@@ -443,9 +844,12 @@ function MainApp({ session }) {
   return (
     <div dir="rtl" style={{ minHeight: "100vh", background: COLORS.bg, color: COLORS.ink }}>
       <header style={{ background: `linear-gradient(135deg, ${COLORS.deep}, #3A1C0C)`, color: "#F3E9D8", padding: "20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 20 }}>نظام إدارة التمر والدبس</div>
-          <div style={{ fontSize: 11.5, color: "#D8C4A8" }}>{session.user.email}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <LogoMark size={42} light />
+          <div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19 }}>{BRAND_NAME}</div>
+            <div style={{ fontSize: 11.5, color: "#D8C4A8" }}>{session.user.email}</div>
+          </div>
         </div>
         <button onClick={logout} style={{ ...ghostBtnStyle, background: "rgba(255,255,255,.1)", color: "#F3E9D8", border: "1px solid rgba(255,255,255,.25)" }}>تسجيل خروج</button>
       </header>
@@ -455,9 +859,17 @@ function MainApp({ session }) {
           {TAB_ORDER.map((key) => {
             const meta = TABLES[key] ? { label: TABLES[key].label, icon: TABLES[key].icon } : TAB_META[key];
             const active = tab === key;
+            const badge = key === "orders" && incoming.length > 0 ? incoming.length : 0;
             return (
-              <button key={key} onClick={() => setTab(key)} style={{ flex: "0 0 auto", padding: "9px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? COLORS.primary : "transparent", color: active ? "#fff" : COLORS.inkSoft }}>
+              <button key={key} onClick={() => setTab(key)} style={{ position: "relative", flex: "0 0 auto", padding: "9px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? COLORS.primary : "transparent", color: active ? "#fff" : COLORS.inkSoft }}>
                 {meta.icon} {meta.label}
+                {badge > 0 && (
+                  <span style={{
+                    position: "absolute", top: 2, insetInlineEnd: 2, minWidth: 18, height: 18,
+                    borderRadius: 9, background: COLORS.alert, color: "#fff", fontSize: 11, fontWeight: 800,
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px",
+                  }}>{badge}</span>
+                )}
               </button>
             );
           })}
@@ -468,8 +880,8 @@ function MainApp({ session }) {
         {tab === "dashboard" && <Dashboard dash={dash} />}
         {tab === "sources" && <SourceSummary summary={sourceSummary} />}
         {tab === "partners" && <Partners partners={data.partners} distribution={partnersDistribution} withdrawals={data.withdrawals} boughtNet={sourceSummary.bought.net} onReload={loadAll} showToast={showToast} />}
-        {tab === "orders" && incoming.length > 0 && (
-          <IncomingOrders incoming={incoming} onAccept={acceptIncoming} onReject={rejectIncoming} />
+        {tab === "orders" && (
+          <IncomingOrders incoming={incoming} onAccept={acceptIncoming} onReject={rejectIncoming} ordersOpen={ordersOpen} onToggleOrders={toggleOrders} />
         )}
         {Object.keys(TABLES).includes(tab) && (
           <DataTable tableKey={tab} config={TABLES[tab]} rows={computedRows[tab] || []} ordersRows={tab === "sales" ? computedRows.orders : undefined} onReload={loadAll} showToast={showToast} />
@@ -556,23 +968,93 @@ function SourceSummary({ summary }) {
   );
 }
 
-function IncomingOrders({ incoming, onAccept, onReject }) {
+function waLink(phone, item) {
+  const digits = String(phone || "").replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  // تحويل الرقم المحلي إلى صيغة دولية للإمارات
+  const intl = digits.startsWith("00") ? digits.slice(2)
+    : digits.startsWith("971") ? digits
+    : digits.startsWith("0") ? "971" + digits.slice(1)
+    : digits;
+  const boxes = num(item.qty);
+  const fee = num(item.delivery_fee);
+  const total = boxes * DEFAULT_BOX_PRICE + fee;
+  const lines = [
+    `مرحباً ${item.first_name || item.name || ""} 👋`,
+    "",
+    "نشكر لكم طلبكم من مزرعتنا، ونفيدكم بأنه تم استلامه بنجاح.",
+    "",
+    "تفاصيل الطلب:",
+    `• الكمية: ${fmt(boxes)} علبة (${fmt(boxes * BOX_SIZE_KG)} كجم)`,
+    `• طريقة الاستلام: ${item.fulfillment || "استلام"}`,
+  ];
+  if (fee > 0) lines.push(`• رسوم التوصيل: ${fmt(fee)} درهم`);
+  lines.push(`• الإجمالي: ${fmt(total)} درهم`);
+  lines.push("");
+  lines.push("نظراً لأن الإنتاج طبيعي ويعتمد على عوامل عدة، سيتم التواصل معكم لتحديد موعد التسليم فور توفر الكمية بإذن الله.");
+  lines.push("");
+  lines.push("شاكرين لكم حسن تعاملكم 🌴");
+  return `https://wa.me/${intl}?text=${encodeURIComponent(lines.join("\n"))}`;
+}
+
+function IncomingOrders({ incoming, onAccept, onReject, ordersOpen, onToggleOrders }) {
   return (
     <div style={{ marginBottom: 20 }}>
-      <SectionTitle title="الطلبات الواردة إلكترونياً" subtitle={`${incoming.length} بانتظار المراجعة`} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+        <SectionTitle title="الطلبات الواردة إلكترونياً" subtitle={incoming.length ? `${incoming.length} بانتظار المراجعة` : "لا توجد طلبات جديدة"} />
+        <button onClick={onToggleOrders} style={{
+          padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 12.5, fontWeight: 700,
+          border: `1px solid ${ordersOpen ? COLORS.alert : COLORS.secondary}`,
+          background: ordersOpen ? "#fff" : COLORS.secondary,
+          color: ordersOpen ? COLORS.alert : "#fff",
+        }}>
+          {ordersOpen ? "⏸️ إيقاف استقبال الطلبات" : "▶️ فتح استقبال الطلبات"}
+        </button>
+      </div>
+
+      {!ordersOpen && (
+        <div style={{ background: COLORS.amberLight, borderRadius: 12, padding: "10px 14px", fontSize: 12.5, color: COLORS.deep, marginBottom: 12 }}>
+          استقبال الطلبات متوقف حالياً — يظهر للعملاء في الرابط: «نفذت الكمية».
+        </div>
+      )}
+
       <div style={{ display: "grid", gap: 10 }}>
-        {incoming.map((item) => (
-          <div key={item.id} style={{ background: COLORS.surface, borderRadius: 12, border: `1px solid ${COLORS.line}`, borderInlineStart: `4px solid ${COLORS.primary}`, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-            <div>
-              <div style={{ fontWeight: 700 }}>{item.name}</div>
-              <div style={{ fontSize: 12, color: COLORS.inkSoft }}>{fmt(item.qty)} علبة{item.phone ? ` — ${item.phone}` : ""}{item.notes ? ` — ${item.notes}` : ""}</div>
+        {incoming.map((item) => {
+          const wa = waLink(item.phone, item);
+          const fee = num(item.delivery_fee);
+          const total = num(item.qty) * DEFAULT_BOX_PRICE + fee;
+          return (
+            <div key={item.id} style={{ background: COLORS.surface, borderRadius: 12, border: `1px solid ${COLORS.line}`, borderInlineStart: `4px solid ${COLORS.primary}`, padding: "12px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+                <div style={{ flex: "1 1 200px" }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.9, marginTop: 3 }}>
+                    {fmt(item.qty)} علبة — {item.fulfillment || "استلام"}
+                    {fee > 0 ? ` — توصيل ${fmt(fee)} درهم` : ""}
+                    <br />
+                    <b style={{ color: COLORS.deep }}>الإجمالي: {fmt(total)} درهم</b>
+                    {item.phone ? <><br />📞 {item.phone}</> : null}
+                    {item.fulfillment === "توصيل" && (
+                      <><br />📍 {item.emirate} — {item.area} — منزل {item.house_number}
+                      {item.delivery_location ? <><br />🗺️ {item.delivery_location}</> : null}</>
+                    )}
+                    {item.notes ? <><br />📝 {item.notes}</> : null}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {wa && (
+                    <a href={wa} target="_blank" rel="noopener noreferrer"
+                      style={{ ...primaryBtnStyle, background: "#25D366", textDecoration: "none", display: "inline-block" }}>
+                      واتساب
+                    </a>
+                  )}
+                  <button onClick={() => onAccept(item)} style={primaryBtnStyle}>قبول</button>
+                  <button onClick={() => onReject(item)} style={dangerBtnStyle}>تجاهل</button>
+                </div>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => onAccept(item)} style={primaryBtnStyle}>قبول</button>
-              <button onClick={() => onReject(item)} style={dangerBtnStyle}>تجاهل</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -781,7 +1263,13 @@ function DataTable({ tableKey, config, rows, ordersRows, onReload, showToast }) 
 /* ============ الجذر: تسجيل الدخول / رابط العميل / التطبيق ============ */
 function Root() {
   const [session, setSession] = useState(undefined);
-  const isCustomerMode = window.location.hash === "#order";
+  const [hash, setHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -789,7 +1277,8 @@ function Root() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  if (isCustomerMode) return <CustomerOrderForm />;
+  if (hash === "#story") return <StoryPage />;
+  if (hash === "#order") return <CustomerOrderForm />;
   if (session === undefined) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg }}>جارِ التحقق…</div>;
   if (!session) return <LoginScreen />;
   return <MainApp session={session} />;
