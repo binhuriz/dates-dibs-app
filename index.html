@@ -643,6 +643,132 @@ function CustomerOrderForm() {
   );
 }
 
+/* ============ صفحة إلغاء الطلب (للعميل عبر رابط خاص) ============ */
+
+function CancelOrderPage({ orderId }) {
+  const [order, setOrder] = useState(undefined);
+  const [reason, setReason] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | saving | done | error
+  const [errMsg, setErrMsg] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.from("incoming_orders").select("*").eq("id", orderId).maybeSingle();
+      if (error || !data) { setOrder(null); return; }
+      setOrder(data);
+    })();
+  }, [orderId]);
+
+  const confirmCancel = async () => {
+    setStatus("saving");
+    const { error } = await supabase.from("incoming_orders")
+      .update({ status: "cancelled", cancel_reason: reason || null, cancelled_by: "العميل" })
+      .eq("id", orderId).eq("status", "pending");
+    if (error) { setErrMsg(error.message || "تعذّر إلغاء الطلب"); setStatus("error"); return; }
+    setOrder((o) => ({ ...o, status: "cancelled" }));
+    setStatus("done");
+  };
+
+  const wrap = { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
+  const card = { maxWidth: 420, width: "100%", background: COLORS.surface, borderRadius: 18, padding: 24, border: `1px solid ${COLORS.line}` };
+
+  if (order === undefined) {
+    return <div dir="rtl" style={wrap}><div style={{ color: COLORS.inkSoft }}>جارٍ التحميل…</div></div>;
+  }
+
+  if (order === null) {
+    return (
+      <div dir="rtl" style={wrap}>
+        <div style={{ ...card, textAlign: "center" }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>🔍</div>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: COLORS.deep }}>لم نعثر على الطلب</div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.9 }}>
+            تأكد من الرابط، أو تواصل معنا مباشرة.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const alreadyCancelled = order.status === "cancelled";
+  const alreadyAccepted = order.status === "accepted";
+  const boxes = num(order.qty);
+  const fee = num(order.delivery_fee);
+  const total = boxes * DEFAULT_BOX_PRICE + fee;
+
+  return (
+    <div dir="rtl" style={wrap}>
+      <div style={card}>
+        <div style={{ marginBottom: 18 }}><LogoLockup size={46} center /></div>
+
+        {status === "done" || alreadyCancelled ? (
+          <div style={{ textAlign: "center", padding: "16px 4px" }}>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>✅</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: COLORS.deep }}>
+              تم إلغاء طلبك
+            </div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 8, lineHeight: 2 }}>
+              نعتذر عن أي إزعاج، ويسعدنا استقبال طلبك مرة أخرى في أي وقت.
+            </div>
+            <a href="#order" style={{ ...ghostBtnStyle, display: "inline-block", textDecoration: "none", marginTop: 18 }}>
+              طلب جديد
+            </a>
+          </div>
+        ) : alreadyAccepted ? (
+          <div style={{ textAlign: "center", padding: "16px 4px" }}>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>📦</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16.5, color: COLORS.deep }}>
+              طلبك قيد التجهيز
+            </div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 8, lineHeight: 2 }}>
+              لم يعد الإلغاء متاحاً من هنا. تواصل معنا عبر واتساب وسنساعدك.
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: COLORS.deep, marginBottom: 6 }}>
+              إلغاء الطلب
+            </div>
+            <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 16, lineHeight: 1.9 }}>
+              تأكد من تفاصيل طلبك قبل الإلغاء.
+            </div>
+
+            <div style={{ background: COLORS.bg, borderRadius: 12, padding: "14px 16px", fontSize: 13, lineHeight: 2.1, marginBottom: 16 }}>
+              <div><b>الاسم:</b> {order.name}</div>
+              <div><b>الكمية:</b> {fmt(boxes)} علبة ({fmt(boxes * BOX_SIZE_KG)} كجم)</div>
+              <div><b>الاستلام:</b> {order.fulfillment || "استلام"}</div>
+              {fee > 0 && <div><b>رسوم التوصيل:</b> {fmt(fee)} درهم</div>}
+              <div style={{ color: COLORS.deep, fontWeight: 800 }}>الإجمالي: {fmt(total)} درهم</div>
+            </div>
+
+            <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>
+              سبب الإلغاء (اختياري)
+              <input value={reason} onChange={(e) => setReason(e.target.value)}
+                placeholder="يساعدنا على التحسين" style={{ ...inputStyle, marginTop: 4 }} />
+            </label>
+
+            {status === "error" && (
+              <div style={{ color: COLORS.alert, fontSize: 12.5, marginTop: 10 }}>{errMsg}</div>
+            )}
+
+            <button onClick={confirmCancel} disabled={status === "saving"}
+              style={{
+                width: "100%", marginTop: 16, padding: "12px 16px", borderRadius: 10,
+                border: "none", background: COLORS.alert, color: "#fff",
+                fontWeight: 700, fontSize: 14, cursor: "pointer",
+              }}>
+              {status === "saving" ? "جارٍ الإلغاء…" : "تأكيد إلغاء الطلب"}
+            </button>
+            <a href="#order" style={{ display: "block", textAlign: "center", marginTop: 14, fontSize: 12.5, color: COLORS.inkSoft, textDecoration: "none" }}>
+              تراجع
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ============ صفحة قصة المنتج ============ */
 
 /* رسم توضيحي: المدبسة — الشمس، الغرفة المحكمة، الأنواط، وقطرات الدبس */
@@ -1132,6 +1258,10 @@ function SourceSummary({ summary }) {
   );
 }
 
+function siteBase() {
+  return window.location.href.split("#")[0];
+}
+
 function intlPhone(phone) {
   const digits = String(phone || "").replace(/[^0-9]/g, "");
   if (!digits) return "";
@@ -1167,6 +1297,9 @@ function waLink(phone, item) {
     lines.push("");
   }
   lines.push("نظراً لأن الإنتاج طبيعي ويعتمد على عوامل عدة، سيتم التواصل معكم لتحديد موعد التسليم فور توفر الكمية بإذن الله.");
+  lines.push("");
+  lines.push("لإلغاء الطلب في أي وقت، اضغط الرابط التالي (مع ذكر السبب إن رغبتم):");
+  lines.push(`${siteBase()}#cancel=${item.id}`);
   lines.push("");
   lines.push("شاكرين لكم حسن تعاملكم 🌴");
   return `https://wa.me/${intl}?text=${encodeURIComponent(lines.join("\n"))}`;
@@ -1251,7 +1384,11 @@ function IncomingOrders({ incoming, cancelled, onAccept, onCancel, ordersOpen, o
                   <div style={{ flex: "1 1 200px" }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>
                       {item.name}
-                      {isCancelled && <span style={{ marginInlineStart: 8, fontSize: 11, color: COLORS.alert, fontWeight: 700 }}>· ملغى</span>}
+                      {isCancelled && (
+                        <span style={{ marginInlineStart: 8, fontSize: 11, color: COLORS.alert, fontWeight: 700 }}>
+                          · ملغى{item.cancelled_by ? ` من ${item.cancelled_by}` : ""}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.9, marginTop: 3 }}>
                       {fmt(item.qty)} علبة — {item.fulfillment || "استلام"}
@@ -1278,6 +1415,7 @@ function IncomingOrders({ incoming, cancelled, onAccept, onCancel, ordersOpen, o
                         );
                       })()}
                       {item.notes ? <><br />📝 {item.notes}</> : null}
+                      {item.cancel_reason ? <><br /><span style={{ color: COLORS.alert }}>✕ سبب الإلغاء: {item.cancel_reason}</span></> : null}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1521,6 +1659,8 @@ function Root() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  const cancelMatch = hash.match(/^#cancel=(\d+)$/);
+  if (cancelMatch) return <CancelOrderPage orderId={cancelMatch[1]} />;
   if (hash === "#story") return <StoryPage />;
   if (hash === "#order") return <CustomerOrderForm />;
   if (session === undefined) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg }}>جارِ التحقق…</div>;
