@@ -1,21 +1,1722 @@
-alter table incoming_orders add column if not exists linked_order_id bigint;
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>المدبسة — دبس تمر طبيعي</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 14C50 14 76 45 76 62A26 26 0 0 1 24 62C24 45 50 14 50 14Z' fill='%23B5651D'/%3E%3Cg stroke='%23F3E3C8' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M50 78L50 42'/%3E%3Cpath d='M50 48C43 42 37 42 32 46'/%3E%3Cpath d='M50 48C57 42 63 42 68 46'/%3E%3Cpath d='M50 58C42 52 35 53 30 58'/%3E%3Cpath d='M50 58C58 52 65 53 70 58'/%3E%3Cpath d='M50 68C43 63 37 64 33 69'/%3E%3Cpath d='M50 68C57 63 63 64 67 69'/%3E%3C/g%3E%3C/svg%3E" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Tajawal, sans-serif; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: right; padding: 8px 10px; font-size: 13px; white-space: nowrap; }
+  input, select { font-family: Tajawal, sans-serif; }
 
-create or replace function cancel_order_by_token(p_token text, p_reason text)
-returns text language plpgsql security definer set search_path = public as $$
-declare s text; lid bigint;
-begin
-  select status, linked_order_id into s, lid from incoming_orders where token = p_token;
-  if s is null then return 'not_found'; end if;
-  if s = 'cancelled' then return 'cancelled'; end if;
-  if s not in ('pending','accepted') then return s; end if;
-  if lid is not null then
-    delete from sales where order_id = lid;
-    delete from orders where id = lid;
-  end if;
-  update incoming_orders
-    set status='cancelled', cancel_reason=p_reason, cancelled_by='العميل'
-    where token = p_token;
-  return 'cancelled';
-end; $$;
+  /* ===== تخطيط صفحة القصة ===== */
+  .st-row { display: grid; grid-template-columns: 1fr; gap: 26px; align-items: center; margin: 0 0 70px; }
+  .st-stack { position: relative; padding-bottom: 46px; padding-inline-start: 40px; }
+  .st-img-a { width: 78%; border-radius: 16px; display: block; box-shadow: 0 18px 40px rgba(74,37,17,.22); object-fit: cover; aspect-ratio: 3/4; }
+  .st-img-b { position: absolute; bottom: 0; inset-inline-start: 0; width: 46%; border-radius: 14px;
+              border: 5px solid #FBF6EC; box-shadow: 0 14px 30px rgba(74,37,17,.26); object-fit: cover; aspect-ratio: 1/1; }
+  .st-num { font-family: Cairo, sans-serif; font-weight: 800; font-size: 54px; line-height: 1;
+            color: #E7DAC5; margin-bottom: -14px; }
+  @media (min-width: 720px) {
+    .st-row { grid-template-columns: 1fr 1fr; gap: 46px; margin-bottom: 96px; }
+    .st-row.rev .st-media { order: 2; }
+    .st-img-a { width: 82%; }
+    .st-img-b { width: 50%; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
 
-grant execute on function cancel_order_by_token(text, text) to anon, authenticated;
+<script>
+// فحص تحميل المكتبات قبل تشغيل التطبيق — يعرض رسالة واضحة بدل صفحة بيضاء
+window.addEventListener("DOMContentLoaded", function () {
+  var missing = [];
+  if (typeof React === "undefined") missing.push("React");
+  if (typeof ReactDOM === "undefined") missing.push("ReactDOM");
+  if (typeof Babel === "undefined") missing.push("Babel");
+  if (typeof window.supabase === "undefined") missing.push("Supabase");
+  if (missing.length) {
+    document.getElementById("root").innerHTML =
+      '<div style="max-width:520px;margin:60px auto;padding:24px;border:1px solid #E7DAC5;border-radius:14px;background:#fff;font-family:Tajawal,sans-serif;color:#2B1B12" dir="rtl">' +
+      '<div style="font-weight:800;font-size:17px;margin-bottom:8px">تعذّر تحميل التطبيق</div>' +
+      '<div style="font-size:13.5px;line-height:1.9;color:#6B5342">لم يتم تحميل: ' + missing.join("، ") +
+      '.<br>تأكد من الاتصال بالإنترنت وأعد تحميل الصفحة.</div></div>';
+  }
+});
+</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+/* ============ إعداد الاتصال بـ Supabase ============ */
+/* عدّل هذين السطرين برابط ومفتاح مشروعك الخاص من Supabase → Settings → API */
+const SUPABASE_URL = "https://gxngygirhwyhnjvvwsah.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_sU50jbymdbgops4qND1JqA_MbKFvymv";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ============ الألوان والتصميم ============ */
+const COLORS = {
+  bg: "#FBF6EC", surface: "#FFFFFF", ink: "#2B1B12", inkSoft: "#6B5342",
+  primary: "#B5651D", primaryDark: "#8F4E15", secondary: "#6B7A3A",
+  deep: "#4A2511", alert: "#A63A32", line: "#E7DAC5", amberLight: "#F3E3C8",
+};
+const inputStyle = { padding: "8px 10px", borderRadius: 8, border: `1px solid ${COLORS.line}`, fontSize: 13, background: "#fff", color: COLORS.ink, width: "100%" };
+const primaryBtnStyle = { padding: "9px 16px", borderRadius: 9, border: "none", background: COLORS.primary, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" };
+const ghostBtnStyle = { padding: "9px 16px", borderRadius: 9, border: `1px solid ${COLORS.line}`, background: "#fff", color: COLORS.inkSoft, fontWeight: 600, fontSize: 13, cursor: "pointer" };
+const dangerBtnStyle = { padding: "6px 10px", borderRadius: 8, border: "none", background: "transparent", color: COLORS.alert, fontWeight: 600, fontSize: 12.5, cursor: "pointer" };
+
+const BRAND_NAME = "المدبسة";
+const BRAND_TAGLINE = "دبس تمر طبيعي";
+const DEFAULT_BOX_PRICE = 150;
+const BOX_SIZE_KG = 4;
+const SOURCE_OPTIONS = ["إنتاج المزرعة", "تمور مشتراة"];
+const PURCHASE_METHOD_OPTIONS = ["بالصندوق", "بالنخلة"];
+const COLLECT_OPTIONS = ["كاش", "تحويل بنكي"];
+const WITHDRAWAL_TYPES = ["نقدي", "علب دبس"];
+
+const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const fmt = (v, digits = 0) => new Intl.NumberFormat("ar-EG", { maximumFractionDigits: digits }).format(v || 0);
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+/* ============ تعريف الجداول ============ */
+const TABLES = {
+  bags: {
+    label: "إنتاج الأكياس", icon: "🌴", table: "bags",
+    columns: [
+      { key: "source", label: "مصدر التمر", type: "select", options: SOURCE_OPTIONS, required: true },
+      { key: "entry_date", label: "تاريخ دخول الغرفة", type: "date" },
+      { key: "exit_date", label: "تاريخ الخروج", type: "date" },
+      { key: "boxes_used", label: "عدد الصناديق المستخدمة (غسيل)", type: "number" },
+      { key: "box_weight", label: "وزن الصندوق (كجم) — يتراوح 18 إلى 20", type: "number" },
+      { key: "bag_count", label: "عدد الأكياس", type: "number" },
+      { key: "notes", label: "ملاحظات", type: "text" },
+    ],
+    computed: (row) => {
+      let duration = "";
+      if (row.entry_date && row.exit_date) {
+        const d = (new Date(row.exit_date) - new Date(row.entry_date)) / 86400000;
+        duration = isNaN(d) ? "" : d;
+      }
+      const boxesPerBag = row.boxes_used && row.bag_count ? num(row.boxes_used) / num(row.bag_count) : "";
+      const totalBoxWeight = row.boxes_used && row.box_weight ? num(row.boxes_used) * num(row.box_weight) : "";
+      return { ...row, duration_days: duration, boxes_per_bag: boxesPerBag, total_box_weight: totalBoxWeight };
+    },
+    display: ["source", "entry_date", "exit_date", "boxes_used", "box_weight", "total_box_weight", "bag_count", "boxes_per_bag", "duration_days", "notes"],
+  },
+  boxes: {
+    label: "إنتاج العلب", icon: "📦", table: "boxes",
+    columns: [
+      { key: "date", label: "التاريخ", type: "date" },
+      { key: "source", label: "مصدر التمر", type: "select", options: SOURCE_OPTIONS, required: true },
+      { key: "box_count", label: "عدد العلب المنتجة", type: "number" },
+      { key: "box_weight", label: "وزن العلبة (كجم)", type: "number" },
+      { key: "notes", label: "ملاحظات", type: "text" },
+    ],
+    computed: (row) => ({ ...row, total_dibs: row.box_count && row.box_weight ? num(row.box_count) * num(row.box_weight) : "" }),
+    display: ["date", "source", "box_count", "box_weight", "total_dibs", "notes"],
+  },
+  purchases: {
+    label: "شراء التمور", icon: "🧺", table: "purchases",
+    columns: [
+      { key: "date", label: "التاريخ", type: "date" },
+      { key: "supplier", label: "المورد/المزرعة", type: "text" },
+      { key: "method", label: "طريقة الشراء", type: "select", options: PURCHASE_METHOD_OPTIONS, required: true },
+      { key: "qty", label: "عدد النخل/الصناديق", type: "number" },
+      { key: "unit_price", label: "سعر الوحدة", type: "number" },
+      { key: "weight", label: "الوزن (كجم)", type: "number" },
+      { key: "buyer", label: "المشتري", type: "text" },
+      { key: "notes", label: "ملاحظات", type: "text" },
+    ],
+    computed: (row) => ({ ...row, total: row.qty && row.unit_price ? num(row.qty) * num(row.unit_price) : "" }),
+    display: ["date", "supplier", "method", "qty", "unit_price", "total", "weight", "buyer", "notes"],
+  },
+  orders: {
+    label: "طلبات العملاء", icon: "📋", table: "orders",
+    columns: [
+      { key: "order_date", label: "تاريخ الطلب", type: "date" },
+      { key: "customer_name", label: "اسم العميل", type: "text", required: true },
+      { key: "qty_requested", label: "الكمية المطلوبة (علبة)", type: "number" },
+      { key: "notes", label: "ملاحظات", type: "text" },
+    ],
+    computed: (row, ctx) => {
+      const linkedSales = (ctx.sales || []).filter((s) => s.order_id === row.id);
+      const delivered = linkedSales.reduce((s, r) => s + num(r.qty), 0);
+      const req = num(row.qty_requested);
+      const remaining = Math.max(0, req - delivered);
+      let status = "";
+      if (row.order_date) status = delivered === 0 ? "جديد" : remaining === 0 ? "مكتمل" : "جزئي";
+      return { ...row, delivered, remaining, status, total_value: req * DEFAULT_BOX_PRICE };
+    },
+    display: ["order_date", "customer_name", "qty_requested", "total_value", "delivered", "remaining", "status", "notes"],
+  },
+  sales: {
+    label: "المبيعات", icon: "💰", table: "sales",
+    columns: [
+      { key: "date", label: "التاريخ", type: "date" },
+      { key: "order_id", label: "رقم الطلب", type: "orderLink" },
+      { key: "source", label: "مصدر التمر", type: "select", options: SOURCE_OPTIONS },
+      { key: "customer", label: "العميل", type: "text" },
+      { key: "qty", label: "عدد العلب", type: "number" },
+      { key: "unit_price", label: "سعر العلبة", type: "number", default: DEFAULT_BOX_PRICE },
+      { key: "payment_method", label: "طريقة التحصيل", type: "select", options: COLLECT_OPTIONS },
+      { key: "notes", label: "ملاحظات", type: "text" },
+    ],
+    computed: (row, ctx) => {
+      const total = row.qty && row.unit_price ? num(row.qty) * num(row.unit_price) : "";
+      let remainingForCustomer = "";
+      if (row.order_id) {
+        const order = (ctx.orders || []).find((o) => o.id === row.order_id);
+        if (order) {
+          const deliveredTotal = (ctx.sales || []).filter((s) => s.order_id === row.order_id).reduce((s, r) => s + num(r.qty), 0);
+          remainingForCustomer = Math.max(0, num(order.qty_requested) - deliveredTotal);
+        }
+      }
+      return { ...row, total, weight_kg: row.qty ? num(row.qty) * BOX_SIZE_KG : "", remaining_for_customer: remainingForCustomer };
+    },
+    display: ["date", "order_id", "source", "customer", "qty", "unit_price", "weight_kg", "total", "remaining_for_customer", "payment_method", "notes"],
+  },
+  nafia: {
+    label: "النفيعة", icon: "🌿", table: "nafia",
+    columns: [
+      { key: "date", label: "التاريخ", type: "date" },
+      { key: "source", label: "مصدر التمر", type: "select", options: SOURCE_OPTIONS },
+      { key: "qty_sacks", label: "الكمية (عدد الجوالي)", type: "number" },
+      { key: "unit_price", label: "سعر بيع الجوال", type: "number" },
+      { key: "buyer", label: "المشتري", type: "text" },
+      { key: "notes", label: "ملاحظات", type: "text" },
+    ],
+    computed: (row) => ({ ...row, total: row.qty_sacks && row.unit_price ? num(row.qty_sacks) * num(row.unit_price) : "" }),
+    display: ["date", "source", "qty_sacks", "unit_price", "total", "buyer", "notes"],
+  },
+  gifts: {
+    label: "العطايا", icon: "🎁", table: "gifts",
+    columns: [
+      { key: "date", label: "التاريخ", type: "date" },
+      { key: "recipient", label: "اسم المستلم", type: "text" },
+      { key: "qty", label: "الكمية (علبة)", type: "number" },
+      { key: "ref_cost", label: "التكلفة المرجعية/علبة", type: "number" },
+      { key: "group_name", label: "المجموعة", type: "text" },
+      { key: "notes", label: "ملاحظات", type: "text" },
+    ],
+    computed: (row) => ({ ...row, total: row.qty && row.ref_cost ? num(row.qty) * num(row.ref_cost) : "" }),
+    display: ["date", "recipient", "qty", "ref_cost", "total", "group_name", "notes"],
+  },
+  costs: {
+    label: "التكاليف", icon: "🧾", table: "costs",
+    columns: [
+      { key: "date", label: "التاريخ", type: "date" },
+      { key: "category", label: "التصنيف", type: "text" },
+      { key: "description", label: "الوصف", type: "text" },
+      { key: "source", label: "المصدر", type: "select", options: [...SOURCE_OPTIONS, "عام"] },
+      { key: "amount", label: "المبلغ", type: "number" },
+      { key: "cost_type", label: "نوع التكلفة", type: "text" },
+      { key: "notes", label: "ملاحظات", type: "text" },
+    ],
+    computed: (row) => row,
+    display: ["date", "category", "description", "source", "amount", "cost_type", "notes"],
+  },
+};
+const TAB_ORDER = ["dashboard", "bags", "boxes", "purchases", "orders", "sales", "nafia", "gifts", "costs", "sources", "partners"];
+const TAB_META = { dashboard: { label: "لوحة التحكم", icon: "📊" }, sources: { label: "ملخص المصادر", icon: "🗂️" }, partners: { label: "الشركاء", icon: "🤝" } };
+
+/* ============ طبقة الاتصال بقاعدة البيانات ============ */
+async function fetchTable(table) {
+  const { data, error } = await supabase.from(table).select("*").order("id", { ascending: true });
+  if (error) { console.error(table, error); return []; }
+  return data || [];
+}
+async function insertRow(table, row) {
+  const { data, error } = await supabase.from(table).insert(row).select();
+  if (error) throw error;
+  return data[0];
+}
+async function updateRow(table, id, patch) {
+  const { error } = await supabase.from(table).update(patch).eq("id", id);
+  if (error) throw error;
+}
+async function deleteRow(table, id) {
+  const { error } = await supabase.from(table).delete().eq("id", id);
+  if (error) throw error;
+}
+async function getSetting(key, fallback) {
+  const { data } = await supabase.from("settings").select("value").eq("key", key).maybeSingle();
+  return data ? data.value : fallback;
+}
+async function setSetting(key, value) {
+  await supabase.from("settings").upsert({ key, value });
+}
+
+/* ============ حسابات لوحة التحكم ============ */
+function computeSourceSummary(rows) {
+  const bags = rows.bags || [], boxes = rows.boxes || [], sales = rows.sales || [], nafia = rows.nafia || [], costs = rows.costs || [], purchases = rows.purchases || [];
+  const purchasedBoxes = purchases.filter((r) => r.method === "بالصندوق").reduce((s, r) => s + num(r.qty), 0);
+  const purchasedPalms = purchases.filter((r) => r.method === "بالنخلة").reduce((s, r) => s + num(r.qty), 0);
+  const bySource = (source) => {
+    const bagsCount = bags.filter((r) => r.source === source).reduce((s, r) => s + num(r.bag_count), 0);
+    const boxesCount = boxes.filter((r) => r.source === source).reduce((s, r) => s + num(r.box_count), 0);
+    const salesRev = sales.filter((r) => r.source === source).reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
+    const nafiaRev = nafia.filter((r) => r.source === source).reduce((s, r) => s + num(r.qty_sacks) * num(r.unit_price), 0);
+    const cost = costs.filter((r) => r.source === source).reduce((s, r) => s + num(r.amount), 0);
+    return { bagsCount, boxes: boxesCount, purchasedBoxes: source === "تمور مشتراة" ? purchasedBoxes : 0, purchasedPalms: source === "تمور مشتراة" ? purchasedPalms : 0, salesRev, nafiaRev, cost, net: salesRev + nafiaRev - cost };
+  };
+  return { farm: bySource("إنتاج المزرعة"), bought: bySource("تمور مشتراة") };
+}
+function computeDash(rows) {
+  const bags = rows.bags || [], boxes = rows.boxes || [], sales = rows.sales || [], nafia = rows.nafia || [], gifts = rows.gifts || [], costs = rows.costs || [];
+  const bagsFarm = bags.filter((r) => r.source === "إنتاج المزرعة").reduce((s, r) => s + num(r.bag_count), 0);
+  const bagsBought = bags.filter((r) => r.source === "تمور مشتراة").reduce((s, r) => s + num(r.bag_count), 0);
+  const boxesFarm = boxes.filter((r) => r.source === "إنتاج المزرعة").reduce((s, r) => s + num(r.box_count), 0);
+  const boxesBought = boxes.filter((r) => r.source === "تمور مشتراة").reduce((s, r) => s + num(r.box_count), 0);
+  const totalDibs = boxes.reduce((s, r) => s + (r.box_count && r.box_weight ? num(r.box_count) * num(r.box_weight) : 0), 0);
+  const nafiaSacks = nafia.reduce((s, r) => s + num(r.qty_sacks), 0);
+  const salesRevenue = sales.reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
+  const nafiaRevenue = nafia.reduce((s, r) => s + num(r.qty_sacks) * num(r.unit_price), 0);
+  const totalRevenue = salesRevenue + nafiaRevenue;
+  const totalCosts = costs.reduce((s, r) => s + num(r.amount), 0);
+  const totalBags = bagsFarm + bagsBought, totalBoxes = boxesFarm + boxesBought;
+  return {
+    bagsFarm, bagsBought, boxesFarm, boxesBought, totalDibs, nafiaSacks, salesRevenue, nafiaRevenue,
+    totalRevenue, totalCosts, netProfit: totalRevenue - totalCosts,
+    avgBoxesPerBag: totalBags > 0 ? totalBoxes / totalBags : 0,
+    totalGiftBoxes: gifts.reduce((s, r) => s + num(r.qty), 0),
+  };
+}
+
+/* ============ اللوجو ============ */
+
+function LogoMark({ size = 56, light = false }) {
+  const id = "g" + size + (light ? "l" : "d");
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="50" y1="14" x2="50" y2="90" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#C87A2A" />
+          <stop offset="0.5" stopColor="#B5651D" />
+          <stop offset="1" stopColor="#4A2511" />
+        </linearGradient>
+      </defs>
+
+      {/* حلقة خارجية */}
+      <circle cx="50" cy="50" r="47" stroke={light ? "rgba(243,233,216,.45)" : "#C99B5A"} strokeWidth="1.5" opacity="0.75" />
+
+      {/* قطرة الدبس */}
+      <path
+        d="M50 14 C50 14 76 45 76 62 A26 26 0 0 1 24 62 C24 45 50 14 50 14 Z"
+        fill={`url(#${id})`}
+      />
+
+      {/* سعفة النخيل داخل القطرة */}
+      <g stroke={light ? "#FBF6EC" : "#F3E3C8"} strokeWidth="2.4" strokeLinecap="round" opacity="0.95">
+        <path d="M50 78 L50 42" />
+        <path d="M50 47 C43 41 37 41 32 45" />
+        <path d="M50 47 C57 41 63 41 68 45" />
+        <path d="M50 56 C42 50 35 51 30 56" />
+        <path d="M50 56 C58 50 65 51 70 56" />
+        <path d="M50 65 C43 60 37 61 33 66" />
+        <path d="M50 65 C57 60 63 61 67 66" />
+      </g>
+    </svg>
+  );
+}
+
+function LogoLockup({ size = 52, light = false, center = false }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: center ? "center" : "flex-start" }}>
+      <LogoMark size={size} light={light} />
+      <div>
+        <div style={{
+          fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: size * 0.42,
+          color: light ? "#FBF6EC" : COLORS.deep, lineHeight: 1.2, letterSpacing: 0.5,
+        }}>{BRAND_NAME}</div>
+        <div style={{
+          fontSize: size * 0.22, color: light ? "#D8C4A8" : COLORS.inkSoft,
+          marginTop: 2, letterSpacing: 1,
+        }}>{BRAND_TAGLINE}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ============ تسجيل الدخول ============ */
+function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true); setError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) setError("بيانات الدخول غير صحيحة");
+  };
+
+  return (
+    <div dir="rtl" style={{ minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ maxWidth: 380, width: "100%", background: COLORS.surface, borderRadius: 18, padding: 28, border: `1px solid ${COLORS.line}` }}>
+        <div style={{ marginBottom: 20 }}>
+          <LogoLockup size={54} />
+        </div>
+        <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 20 }}>تسجيل دخول صاحب النظام</div>
+        <form onSubmit={submit}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <input type="email" required placeholder="البريد الإلكتروني" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+            <input type="password" required placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
+          </div>
+          {error && <div style={{ color: COLORS.alert, fontSize: 12.5, marginTop: 10 }}>{error}</div>}
+          <button type="submit" disabled={loading} style={{ ...primaryBtnStyle, width: "100%", marginTop: 16, padding: "11px 16px" }}>
+            {loading ? "جارٍ الدخول…" : "دخول"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ============ نموذج طلب العميل العام (بدون تسجيل دخول) ============ */
+
+const EMIRATES = ["رأس الخيمة", "أبوظبي", "دبي", "الشارقة", "عجمان", "أم القيوين", "الفجيرة"];
+
+function CustomerOrderForm() {
+  const [form, setForm] = useState({
+    first_name: "", last_name: "", phone: "", qty: "",
+    fulfillment: "استلام", emirate: "", area: "", delivery_location: "", house_number: "", notes: "",
+  });
+  const [status, setStatus] = useState("idle");
+  const [errMsg, setErrMsg] = useState("");
+  const [ordersOpen, setOrdersOpen] = useState(null);
+  const [fees, setFees] = useState({ rak: 30, other: 60 });
+  const [geo, setGeo] = useState("idle"); // idle | loading | done | error
+  const [coords, setCoords] = useState(null);
+
+  const shareLocation = () => {
+    if (!navigator.geolocation) { setGeo("error"); return; }
+    setGeo("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeo("done");
+      },
+      () => setGeo("error"),
+      { enableHighAccuracy: true, timeout: 12000 }
+    );
+  };
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("settings").select("key,value").in("key", ["orders_open", "delivery_fee_rak", "delivery_fee_other"]);
+      let open = true, rak = 30, other = 60;
+      (data || []).forEach((r) => {
+        if (r.key === "orders_open") open = r.value !== false && r.value !== "false";
+        if (r.key === "delivery_fee_rak") rak = num(r.value);
+        if (r.key === "delivery_fee_other") other = num(r.value);
+      });
+      setFees({ rak: rak || 30, other: other || 60 });
+      setOrdersOpen(open);
+    })();
+  }, []);
+
+  const deliveryFee = form.fulfillment !== "توصيل" ? 0
+    : form.emirate === "رأس الخيمة" ? fees.rak
+    : form.emirate ? fees.other : 0;
+  const boxesTotal = num(form.qty) * DEFAULT_BOX_PRICE;
+  const grandTotal = boxesTotal + deliveryFee;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.first_name.trim() || !form.qty) return;
+    setStatus("saving");
+    try {
+      const payload = {
+        name: `${form.first_name} ${form.last_name}`.trim(),
+        first_name: form.first_name, last_name: form.last_name,
+        phone: form.phone, qty: num(form.qty), notes: form.notes,
+        fulfillment: form.fulfillment, delivery_fee: deliveryFee,
+      };
+      if (form.fulfillment === "توصيل") {
+        payload.emirate = form.emirate;
+        payload.area = form.area;
+        payload.house_number = form.house_number;
+        const mapUrl = coords ? `https://maps.google.com/?q=${coords.lat},${coords.lng}` : "";
+        payload.delivery_location = [mapUrl, form.delivery_location].filter(Boolean).join(" | ");
+      }
+      const { error } = await supabase.from("incoming_orders").insert(payload);
+      if (error) { console.error(error); setErrMsg(error.message || "تعذّر إرسال الطلب"); setStatus("error"); return; }
+      setStatus("done");
+    } catch (err) {
+      console.error(err); setErrMsg(String(err && err.message ? err.message : err)); setStatus("error");
+    }
+  };
+
+  const card = { maxWidth: 460, width: "100%", background: COLORS.surface, borderRadius: 18, padding: 24, border: `1px solid ${COLORS.line}` };
+  const wrap = { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
+
+  if (ordersOpen === null) {
+    return <div dir="rtl" style={wrap}><div style={{ color: COLORS.inkSoft }}>جارٍ التحميل…</div></div>;
+  }
+
+  if (!ordersOpen) {
+    return (
+      <div dir="rtl" style={wrap}>
+        <div style={{ ...card, textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🌴</div>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep, marginBottom: 8 }}>
+            نفذت الكمية حالياً
+          </div>
+          <div style={{ fontSize: 13.5, color: COLORS.inkSoft, lineHeight: 1.9 }}>
+            نعتذر، استقبال الطلبات متوقف مؤقتاً لحين توفر إنتاج جديد.
+            <br />نشكر لكم اهتمامكم، وسنستقبل طلباتكم فور توفر الكمية بإذن الله.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div dir="rtl" style={wrap}>
+      <div style={card}>
+        <div style={{ marginBottom: 16 }}>
+          <LogoLockup size={50} center />
+        </div>
+        <div style={{ borderRadius: 14, overflow: "hidden", marginBottom: 16, position: "relative" }}>
+          <img src="pour.jpeg" alt="دبس التمر" style={{ width: "100%", height: 170, objectFit: "cover", display: "block" }} />
+          <span style={{ position: "absolute", top: 10, insetInlineStart: 10, background: "rgba(107,122,58,.92)", color: "#fff", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>
+            🌿 ORGANIC
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep }}>تسجيل طلب دبس</div>
+        </div>
+        <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 14, lineHeight: 1.8 }}>
+          دبس تمر من نخيل المزرعة — مكوّن واحد فقط: التمر.
+        </div>
+        <a href="#story" style={{
+          display: "block", textDecoration: "none", marginBottom: 18,
+          background: COLORS.amberLight, borderRadius: 12, padding: "10px 14px",
+          fontSize: 12.5, color: COLORS.deep, fontWeight: 700,
+        }}>
+          🌴 تعرّف على رحلة المنتج — من النخلة للمدبسة ←
+        </a>
+
+        {status === "done" ? (
+          <div style={{ textAlign: "center", padding: "24px 8px" }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 700, fontSize: 16, color: COLORS.deep }}>تم استلام طلبك بنجاح</div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.9 }}>
+              سيتم التواصل معك لتأكيد الطلب، وتحديد موعد التسليم حسب توفر الإنتاج.
+              <br />
+              <b style={{ color: COLORS.secondary }}>الدفع عند الاستلام.</b>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={submit}>
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>الاسم
+                  <input required value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                </label>
+                <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>اللقب
+                  <input value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                </label>
+              </div>
+
+              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>رقم التواصل (واتساب)
+                <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="مثال: 0501234567" style={{ ...inputStyle, marginTop: 4 }} />
+              </label>
+
+              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>الكمية المطلوبة (عدد العلب)
+                <input required type="number" min="1" value={form.qty} onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              </label>
+              <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>العلبة الواحدة {BOX_SIZE_KG} كجم (منّ) بسعر {DEFAULT_BOX_PRICE} درهم.</div>
+
+              <div>
+                <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 6 }}>طريقة الاستلام</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {["استلام", "توصيل"].map((opt) => (
+                    <button key={opt} type="button" onClick={() => setForm((f) => ({ ...f, fulfillment: opt }))}
+                      style={{
+                        padding: "10px 8px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700,
+                        border: `1px solid ${form.fulfillment === opt ? COLORS.primary : COLORS.line}`,
+                        background: form.fulfillment === opt ? COLORS.primary : "#fff",
+                        color: form.fulfillment === opt ? "#fff" : COLORS.inkSoft,
+                      }}>
+                      {opt === "استلام" ? "🏠 استلام من المزرعة" : "🚚 توصيل"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {form.fulfillment === "توصيل" && (
+                <div style={{ display: "grid", gap: 10, background: COLORS.amberLight, padding: 12, borderRadius: 12 }}>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>الإمارة
+                    <select required value={form.emirate} onChange={(e) => setForm((f) => ({ ...f, emirate: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }}>
+                      <option value="">— اختر —</option>
+                      {EMIRATES.map((em) => <option key={em} value={em}>{em}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>المنطقة
+                    <input required value={form.area} onChange={(e) => setForm((f) => ({ ...f, area: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                  </label>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>رقم المنزل / الفيلا
+                    <input required value={form.house_number} onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                  </label>
+                  <div>
+                    <div style={{ fontSize: 12.5, color: COLORS.deep, marginBottom: 6 }}>موقع التوصيل</div>
+                    <button type="button" onClick={shareLocation} disabled={geo === "loading"}
+                      style={{
+                        width: "100%", padding: "11px 14px", borderRadius: 10, cursor: "pointer",
+                        fontSize: 13, fontWeight: 700,
+                        border: `1px solid ${geo === "done" ? COLORS.secondary : COLORS.primary}`,
+                        background: geo === "done" ? "#E7F0D8" : "#fff",
+                        color: geo === "done" ? COLORS.secondary : COLORS.primary,
+                      }}>
+                      {geo === "loading" ? "جارٍ تحديد الموقع…"
+                        : geo === "done" ? "✓ تم تحديد موقعك"
+                        : "📍 شارك موقعك الحالي"}
+                    </button>
+                    {geo === "error" && (
+                      <div style={{ fontSize: 11.5, color: COLORS.alert, marginTop: 6, lineHeight: 1.8 }}>
+                        تعذّر تحديد الموقع. اسمح بالوصول للموقع، أو اكتب وصفاً بالأسفل.
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.8 }}>
+                      يساعد المندوب على الوصول إليك بدقة.
+                    </div>
+                  </div>
+                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>وصف الموقع (اختياري)
+                    <input value={form.delivery_location} onChange={(e) => setForm((f) => ({ ...f, delivery_location: e.target.value }))} placeholder="أقرب معلم أو وصف مختصر" style={{ ...inputStyle, marginTop: 4 }} />
+                  </label>
+                  {form.emirate && (
+                    <div style={{ fontSize: 12, color: COLORS.deep, fontWeight: 700 }}>
+                      رسوم التوصيل: {fmt(deliveryFee)} درهم
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>ملاحظات (اختياري)
+                <input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              </label>
+
+              {num(form.qty) > 0 && (
+                <div style={{ background: "#fff", border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: 12, fontSize: 13 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ color: COLORS.inkSoft }}>{fmt(num(form.qty))} علبة × {DEFAULT_BOX_PRICE}</span>
+                    <span>{fmt(boxesTotal)}</span>
+                  </div>
+                  {deliveryFee > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ color: COLORS.inkSoft }}>رسوم التوصيل</span>
+                      <span>{fmt(deliveryFee)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${COLORS.line}`, paddingTop: 6, marginTop: 6, fontWeight: 800, color: COLORS.deep }}>
+                    <span>الإجمالي</span>
+                    <span>{fmt(grandTotal)} درهم</span>
+                  </div>
+                  <div style={{ marginTop: 10, background: "#E7F0D8", color: COLORS.secondary, borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, textAlign: "center" }}>
+                    💵 الدفع عند الاستلام
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {status === "error" && <div style={{ color: COLORS.alert, fontSize: 12.5, marginTop: 10 }}>{errMsg || "حدث خطأ، حاول مرة أخرى."}</div>}
+            <button type="submit" disabled={status === "saving"} style={{ ...primaryBtnStyle, width: "100%", marginTop: 16, padding: "11px 16px" }}>
+              {status === "saving" ? "جارٍ الإرسال…" : "إرسال الطلب"}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============ صفحة إلغاء الطلب (للعميل عبر رابط خاص) ============ */
+
+function CancelOrderPage({ token }) {
+  const [order, setOrder] = useState(undefined);
+  const [reason, setReason] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | saving | done | error
+  const [errMsg, setErrMsg] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      if (!token) { setOrder(null); return; }
+      const { data, error } = await supabase.rpc("get_order_by_token", { p_token: token });
+      if (error) { console.error(error); setOrder(null); return; }
+      if (!data || !data.length) { setOrder(null); return; }
+      setOrder(data[0]);
+    })();
+  }, [token]);
+
+  const confirmCancel = async () => {
+    setStatus("saving");
+    const { data, error } = await supabase.rpc("cancel_order_by_token", { p_token: token, p_reason: reason || null });
+    if (error) { setErrMsg(error.message || "تعذّر إلغاء الطلب"); setStatus("error"); return; }
+    if (data === "not_found") { setOrder(null); return; }
+    setOrder((o) => ({ ...o, status: data === "cancelled" ? "cancelled" : data }));
+    setStatus(data === "cancelled" ? "done" : "idle");
+  };
+
+  const wrap = { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
+  const card = { maxWidth: 420, width: "100%", background: COLORS.surface, borderRadius: 18, padding: 24, border: `1px solid ${COLORS.line}` };
+
+  if (order === undefined) {
+    return <div dir="rtl" style={wrap}><div style={{ color: COLORS.inkSoft }}>جارٍ التحميل…</div></div>;
+  }
+
+  if (order === null) {
+    return (
+      <div dir="rtl" style={wrap}>
+        <div style={{ ...card, textAlign: "center" }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>🔍</div>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: COLORS.deep }}>الرابط غير صالح</div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.9 }}>
+            تأكد من نسخ الرابط كاملاً، أو تواصل معنا عبر واتساب وسنساعدك.
+          </div>
+          <a href="#order" style={{ ...ghostBtnStyle, display: "inline-block", textDecoration: "none", marginTop: 18 }}>
+            صفحة الطلب
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  const alreadyCancelled = order.status === "cancelled";
+  const alreadyAccepted = order.status === "accepted";
+  const boxes = num(order.qty);
+  const fee = num(order.delivery_fee);
+  const total = boxes * DEFAULT_BOX_PRICE + fee;
+
+  return (
+    <div dir="rtl" style={wrap}>
+      <div style={card}>
+        <div style={{ marginBottom: 18 }}><LogoLockup size={46} center /></div>
+
+        {status === "done" || alreadyCancelled ? (
+          <div style={{ textAlign: "center", padding: "16px 4px" }}>
+            <div style={{ fontSize: 38, marginBottom: 10 }}>✅</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: COLORS.deep }}>
+              تم إلغاء طلبك
+            </div>
+            {order.order_code && (
+              <div style={{ fontSize: 12.5, color: COLORS.primary, fontWeight: 700, marginTop: 6 }}>
+                🔖 {order.order_code}
+              </div>
+            )}
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 8, lineHeight: 2 }}>
+              نعتذر عن أي إزعاج، ويسعدنا استقبال طلبك مرة أخرى في أي وقت.
+            </div>
+            <a href="#order" style={{ ...ghostBtnStyle, display: "inline-block", textDecoration: "none", marginTop: 18 }}>
+              طلب جديد
+            </a>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: COLORS.deep, marginBottom: 6 }}>
+              إلغاء الطلب
+            </div>
+            <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 16, lineHeight: 1.9 }}>
+              تأكد من تفاصيل طلبك قبل الإلغاء.
+            </div>
+            {alreadyAccepted && (
+              <div style={{ background: COLORS.amberLight, color: COLORS.deep, borderRadius: 10, padding: "10px 12px", fontSize: 12.5, lineHeight: 1.9, marginBottom: 14 }}>
+                ⚠️ طلبك مؤكّد وقيد التجهيز — إلغاؤه الآن سيلغي الحجز نهائياً.
+              </div>
+            )}
+
+            <div style={{ background: COLORS.bg, borderRadius: 12, padding: "14px 16px", fontSize: 13, lineHeight: 2.1, marginBottom: 16 }}>
+              <div style={{ color: COLORS.primary, fontWeight: 800, marginBottom: 4 }}>🔖 رقم الطلب: {order.order_code}</div>
+              <div><b>الاسم:</b> {order.name}</div>
+              <div><b>الكمية:</b> {fmt(boxes)} علبة ({fmt(boxes * BOX_SIZE_KG)} كجم)</div>
+              <div><b>الاستلام:</b> {order.fulfillment || "استلام"}</div>
+              {fee > 0 && <div><b>رسوم التوصيل:</b> {fmt(fee)} درهم</div>}
+              <div style={{ color: COLORS.deep, fontWeight: 800 }}>الإجمالي: {fmt(total)} درهم</div>
+            </div>
+
+            <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>
+              سبب الإلغاء (اختياري)
+              <input value={reason} onChange={(e) => setReason(e.target.value)}
+                placeholder="يساعدنا على التحسين" style={{ ...inputStyle, marginTop: 4 }} />
+            </label>
+
+            {status === "error" && (
+              <div style={{ color: COLORS.alert, fontSize: 12.5, marginTop: 10 }}>{errMsg}</div>
+            )}
+
+            <button onClick={confirmCancel} disabled={status === "saving"}
+              style={{
+                width: "100%", marginTop: 16, padding: "12px 16px", borderRadius: 10,
+                border: "none", background: COLORS.alert, color: "#fff",
+                fontWeight: 700, fontSize: 14, cursor: "pointer",
+              }}>
+              {status === "saving" ? "جارٍ الإلغاء…" : "تأكيد إلغاء الطلب"}
+            </button>
+            <a href="#order" style={{ display: "block", textAlign: "center", marginTop: 14, fontSize: 12.5, color: COLORS.inkSoft, textDecoration: "none" }}>
+              تراجع
+            </a>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============ صفحة قصة المنتج ============ */
+
+/* رسم توضيحي: المدبسة — الشمس، الغرفة المحكمة، الأنواط، وقطرات الدبس */
+function MadbasaIllustration() {
+  return (
+    <svg viewBox="0 0 400 300" style={{ width: "100%", display: "block", borderRadius: 18, background: "#2B1B12" }} role="img" aria-label="رسم توضيحي للمدبسة">
+      <defs>
+        <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#F5C563" stopOpacity="0.95" />
+          <stop offset="0.55" stopColor="#E09A34" stopOpacity="0.35" />
+          <stop offset="1" stopColor="#E09A34" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="heatGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#C87A2A" stopOpacity="0.34" />
+          <stop offset="1" stopColor="#C87A2A" stopOpacity="0.03" />
+        </linearGradient>
+        <linearGradient id="dropGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#E0A040" />
+          <stop offset="1" stopColor="#8F4E15" />
+        </linearGradient>
+      </defs>
+
+      {/* الشمس وهالتها */}
+      <circle cx="330" cy="52" r="72" fill="url(#sunGlow)" />
+      <circle cx="330" cy="52" r="21" fill="#F5C563" />
+      <g stroke="#F5C563" strokeWidth="2" strokeLinecap="round" opacity="0.75">
+        <path d="M330 18 L330 6" /><path d="M330 98 L330 110" />
+        <path d="M296 52 L284 52" /><path d="M364 52 L376 52" />
+        <path d="M306 28 L297 19" /><path d="M354 76 L363 85" />
+        <path d="M354 28 L363 19" /><path d="M306 76 L297 85" />
+      </g>
+
+      {/* أشعة تنزل على سقف الغرفة */}
+      <g stroke="#F5C563" strokeWidth="1.4" opacity="0.4" strokeLinecap="round">
+        <path d="M300 88 L246 132" /><path d="M322 96 L282 132" /><path d="M344 100 L318 132" />
+      </g>
+
+      {/* جسم الغرفة */}
+      <rect x="44" y="132" width="250" height="140" rx="8" fill="#3A2214" stroke="#C99B5A" strokeWidth="2" />
+      {/* السقف */}
+      <path d="M34 132 L169 74 L304 132 Z" fill="#4A2511" stroke="#C99B5A" strokeWidth="2" strokeLinejoin="round" />
+      {/* الحرارة المحتبسة داخل الغرفة */}
+      <rect x="52" y="140" width="234" height="124" rx="6" fill="url(#heatGrad)" />
+
+      {/* موجات الحرارة */}
+      <g stroke="#E0A040" strokeWidth="1.6" fill="none" opacity="0.5" strokeLinecap="round">
+        <path d="M86 168 q10 -9 20 0 t20 0" />
+        <path d="M206 162 q10 -9 20 0 t20 0" />
+        <path d="M140 152 q10 -9 20 0 t20 0" />
+      </g>
+
+      {/* الأنواط مكدّسة */}
+      <g fill="#B08A55" stroke="#7A5A32" strokeWidth="1.5">
+        <rect x="74" y="212" width="76" height="24" rx="12" />
+        <rect x="158" y="212" width="76" height="24" rx="12" />
+        <rect x="92" y="188" width="76" height="24" rx="12" />
+        <rect x="176" y="188" width="72" height="24" rx="12" />
+        <rect x="120" y="164" width="76" height="24" rx="12" />
+      </g>
+      {/* نسيج الخوص */}
+      <g stroke="#8C6B3E" strokeWidth="0.9" opacity="0.65">
+        <path d="M84 214 l10 20 M104 214 l10 20 M124 214 l10 20" />
+        <path d="M168 214 l10 20 M188 214 l10 20 M208 214 l10 20" />
+        <path d="M130 166 l10 20 M150 166 l10 20 M170 166 l10 20" />
+      </g>
+
+      {/* أرضية التجميع */}
+      <rect x="52" y="244" width="234" height="20" rx="4" fill="#241309" />
+      {/* الدبس المتجمّع */}
+      <rect x="60" y="252" width="218" height="9" rx="4" fill="#6B3A12" />
+      <rect x="60" y="252" width="218" height="4" rx="2" fill="#8F4E15" opacity="0.85" />
+
+      {/* قطرات الدبس */}
+      <g fill="url(#dropGrad)">
+        <path d="M112 238 c0 0 6 8 6 11 a6 6 0 0 1 -12 0 c0 -3 6 -11 6 -11 Z" />
+        <path d="M196 240 c0 0 5 7 5 9.5 a5 5 0 0 1 -10 0 c0 -2.5 5 -9.5 5 -9.5 Z" opacity="0.9" />
+        <path d="M154 246 c0 0 4 6 4 8 a4 4 0 0 1 -8 0 c0 -2 4 -8 4 -8 Z" opacity="0.8" />
+      </g>
+      {/* خيوط سيلان رفيعة */}
+      <g stroke="#A6641F" strokeWidth="1.6" strokeLinecap="round" opacity="0.8">
+        <path d="M112 236 L112 226" /><path d="M196 238 L196 230" /><path d="M154 244 L154 238" />
+      </g>
+    </svg>
+  );
+}
+
+
+
+/* كل مرحلة: صورتان متداخلتان + نص جانبي */
+const STORY_STEPS = [
+  {
+    a: "palm.jpeg", b: "dates.jpeg",
+    kicker: "الأصل",
+    title: "نخلة واحدة… وصنف واحد",
+    text: "بالمناطق الشرقية والشمالية من الدولة، يكبر صنف وحيد أصيل — ما نخلطه بغيره. سنة كاملة من العناية: إصلاح التربة، والتلقيح بوقته، والسقي بميزان. وبعدها ننتظر… يمر التمر بأطواره: بسر، فرطب، فتمر — لين يبدا الهمد وهو بعده على النخلة، ويتحول لونه للغامق.",
+    note: "١٢ شهراً من العناية قبل أول حبة",
+  },
+  {
+    a: "harvest.jpeg", b: "mastah.jpeg",
+    kicker: "الحصاد",
+    title: "اليـداد",
+    text: "ما فيه آلة تقدر تسويها. يطلع الرجّال النخلة بحبل وخبرة، تحت شمس تحرق، ويقص العذوق وحدة وحدة بعد اكتمال النضج تماماً — لا قبل ولا بعد. نخلة نخلة، وعذق عذق. من هني يروح التمر للمسطاح، يتروّح على الشمس أياماً كما كانوا يسوون الأولين.",
+    note: "بالأيدي وحدها — نخلة نخلة",
+  },
+  {
+    a: "Massage.jpg.jpeg", b: "anwat.jpeg",
+    kicker: "الانتقاء",
+    title: "المنتقى والأنـواط",
+    text: "أطول مرحلة وأصعبها. نتنقى التمر الزين حبة حبة، والحشف نيمّعه للنفيعة — ما نسمح لحبة وحدة تعدّي. يقولون الأولين: «عمر الحشف ما نزل دبس» — فاقد الشي لا يعطيه. يُغسل، ويتروّح ثاني بادي، ويُعبّى بالأنواط، أكياس مضفورة من سعف النخيل بأيادي الحرفيين.",
+    note: "حبة حبة — ما تعدّي وحدة",
+  },
+  {
+    a: "madbasa.jpeg", b: "pour.jpeg",
+    kicker: "السر",
+    title: "المدبسة",
+    text: "هني يصير الشغل كله. غرفة محكمة الإغلاق، عديمة التهوية، ترتفع حرارتها بأشعة الشمس. تكدّس الأنواط فوق بعض، وثقلها مع الحرارة تسيل قطرات الدبس على مدى الأيام. يُجمع من كل مدبسة على حدة، ثم يدخل خزان التعبئة.",
+  },
+];
+
+function StoryPage() {
+  return (
+    <div dir="rtl" style={{ background: COLORS.bg, minHeight: "100vh", color: COLORS.ink }}>
+
+      {/* ===== واجهة مختصرة ===== */}
+      <div style={{ position: "relative", minHeight: "52vh", overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
+        <img src="pour.jpeg" alt="دبس تمر طبيعي"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(43,27,18,.95) 10%, rgba(43,27,18,.4) 60%, rgba(43,27,18,.2) 100%)" }} />
+        <div style={{ position: "relative", padding: "0 22px 38px", width: "100%", maxWidth: 900, margin: "0 auto" }}>
+          <div style={{ marginBottom: 18 }}><LogoLockup size={50} light /></div>
+          <h1 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 32, lineHeight: 1.3, color: "#FBF6EC", margin: "0 0 12px" }}>
+            الدبس الكهرماني<br />مستخلص بطرق أسلافنا
+          </h1>
+          <p style={{ fontSize: 14.5, color: "#E3D3BB", lineHeight: 1.95, margin: 0, maxWidth: 480 }}>
+            من نخيل المزرعة، بموسم واحد في السنة.
+          </p>
+        </div>
+      </div>
+
+      {/* ===== الإرث ===== */}
+      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "38px 20px" }}>
+        <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
+          <div style={{ fontSize: 30, marginBottom: 16 }}>🌴</div>
+          <p style={{ fontSize: 15.5, lineHeight: 2.3, margin: "0 0 22px", color: "#E3D3BB" }}>
+            قبل الكهرباء، وقبل المصانع، عرف أهلنا أن الشمس تكفي.
+            كانوا يطلعون النخلة بحبل، ويفرشون التمر على المسطاح، وينتظرون…
+            لأنهم يعرفون أن الطيب ما يجي بالاستعجال.
+          </p>
+          <p style={{ fontSize: 15.5, lineHeight: 2.3, margin: 0, color: "#E3D3BB" }}>
+            ورثنا الطريقة كما هي، وما غيّرنا فيها حرف —
+            <br />
+            <b style={{ color: "#FBF6EC" }}>غيّرنا الأدوات فقط، حفاظاً على النظافة والدقة.</b>
+          </p>
+          <div style={{ height: 1, background: "rgba(243,233,216,.22)", margin: "26px auto", maxWidth: 180 }} />
+          <div style={{ fontSize: 13, color: "#C9B393", lineHeight: 2 }}>
+            كل علبة تمر عليها: عام من العناية · شهور من الشمس · وأيادٍ لا تعرف الاختصار
+          </div>
+        </div>
+      </div>
+
+      {/* ===== المراحل ===== */}
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 20px 20px" }}>
+        {STORY_STEPS.map((s, i) => (
+          <React.Fragment key={s.a}>
+            {i === 3 && (
+              <div style={{ margin: "0 0 60px" }}>
+                <MadbasaIllustration />
+                <div style={{ textAlign: "center", fontSize: 12.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.9 }}>
+                  الشمس ترفع حرارة الغرفة · ثقل الأنواط يعصر التمر بنفسه · الدبس ينزل قطرة قطرة
+                </div>
+              </div>
+            )}
+            <div className={"st-row" + (i % 2 ? " rev" : "")}>
+            <div className="st-media">
+              <div className="st-stack">
+                <img className="st-img-a" src={s.a} alt={s.title} loading="lazy" />
+                <img className="st-img-b" src={s.b} alt={s.title} loading="lazy" />
+              </div>
+            </div>
+            <div>
+              <div className="st-num">{"0" + (i + 1)}</div>
+              <div style={{ fontSize: 11.5, color: COLORS.primary, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>
+                {s.kicker}
+              </div>
+              <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 25, color: COLORS.deep, margin: "0 0 12px", lineHeight: 1.35 }}>
+                {s.title}
+              </h2>
+              <p style={{ fontSize: 14.5, lineHeight: 2.1, color: COLORS.inkSoft, margin: 0 }}>{s.text}</p>
+              {s.note && (
+                <div style={{
+                  display: "inline-block", marginTop: 16, background: COLORS.amberLight,
+                  color: COLORS.deep, borderRadius: 20, padding: "7px 16px",
+                  fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
+                }}>
+                  {s.note}
+                </div>
+              )}
+            </div>
+          </div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* ===== التعبئة ===== */}
+      <div style={{ background: COLORS.amberLight, padding: "46px 20px" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          <div className="st-row">
+            <div className="st-media">
+              <img src="filling.jpeg" alt="تعبئة الدبس" loading="lazy"
+                style={{ width: "100%", borderRadius: 18, boxShadow: "0 18px 40px rgba(74,37,17,.22)", objectFit: "cover", aspectRatio: "4/3" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, color: COLORS.primary, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>التعبئة</div>
+              <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 25, color: COLORS.deep, margin: "0 0 12px" }}>
+                بالمنّ… كما عرفوه
+              </h2>
+              <p style={{ fontSize: 14.5, lineHeight: 2.1, color: COLORS.inkSoft, margin: "0 0 18px" }}>
+                يُعبّأ بالمقاييس المتوارثة في المنطقة، ويصل إليكم كما خرج من المدبسة تماماً.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {[{ n: "المنّ", kg: BOX_SIZE_KG, price: DEFAULT_BOX_PRICE }, { n: "المنّين", kg: BOX_SIZE_KG * 2, price: DEFAULT_BOX_PRICE * 2 }].map((m) => (
+                  <div key={m.n} style={{ background: "#fff", border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: "16px 12px", textAlign: "center" }}>
+                    <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19, color: COLORS.deep }}>{m.n}</div>
+                    <div style={{ fontSize: 12, color: COLORS.inkSoft, margin: "4px 0 8px" }}>{m.kg} كيلو</div>
+                    <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16, color: COLORS.primary }}>{m.price} درهم</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== الطلب ===== */}
+      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "56px 20px" }}>
+        <div style={{ maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
+          <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 26, margin: "0 0 12px", lineHeight: 1.5 }}>
+            موسم واحد في السنة
+          </h2>
+          <p style={{ fontSize: 14.5, lineHeight: 2.1, color: "#E3D3BB", margin: "0 0 28px" }}>
+            الكمية محدودة بما تعطيه النخلة — احجز نصيبك قبل نفادها.
+          </p>
+          <a href="#order" style={{
+            display: "inline-block", textDecoration: "none", padding: "16px 52px",
+            fontSize: 16, fontWeight: 800, borderRadius: 12,
+            background: COLORS.primary, color: "#fff",
+            fontFamily: "Cairo, sans-serif",
+          }}>
+            اطلب الآن
+          </a>
+          <div style={{ fontSize: 12.5, color: "#C9B393", marginTop: 16 }}>
+            الدفع عند الاستلام · توصيل لجميع الإمارات
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============ التطبيق الرئيسي (بعد تسجيل الدخول) ============ */
+function MainApp({ session }) {
+  const [tab, setTab] = useState("dashboard");
+  const [data, setData] = useState({ bags: [], boxes: [], purchases: [], orders: [], sales: [], nafia: [], gifts: [], costs: [], withdrawals: [], partners: [] });
+  const [incoming, setIncoming] = useState([]);
+  const [cancelled, setCancelled] = useState([]);
+  const [ordersOpen, setOrdersOpen] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [toast, setToast] = useState(null);
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); }, []);
+
+  const loadAll = useCallback(async () => {
+    const keys = Object.keys(TABLES);
+    const results = await Promise.all(keys.map((k) => fetchTable(TABLES[k].table)));
+    const next = {};
+    keys.forEach((k, i) => (next[k] = results[i]));
+    next.withdrawals = await fetchTable("withdrawals");
+    next.partners = await fetchTable("partners");
+    if (next.partners.length === 0) {
+      const defaults = [{ name: "حسن", pct: 33.333 }, { name: "أحمد", pct: 33.333 }, { name: "عزيز وناصر", pct: 33.334 }];
+      for (const p of defaults) await insertRow("partners", p);
+      next.partners = await fetchTable("partners");
+    }
+    setData(next);
+    const { data: inc } = await supabase.from("incoming_orders").select("*").eq("status", "pending").order("submitted_at", { ascending: true });
+    setIncoming(inc || []);
+    const { data: canc } = await supabase.from("incoming_orders").select("*").eq("status", "cancelled").order("submitted_at", { ascending: false });
+    setCancelled(canc || []);
+    const openVal = await getSetting("orders_open", true);
+    setOrdersOpen(openVal !== false && openVal !== "false");
+    setLoaded(true);
+  }, []);
+
+  const toggleOrders = async () => {
+    const next = !ordersOpen;
+    await setSetting("orders_open", next);
+    setOrdersOpen(next);
+    showToast(next ? "تم فتح استقبال الطلبات" : "تم إيقاف استقبال الطلبات");
+  };
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const computedRows = useMemo(() => {
+    const out = {};
+    for (const key of Object.keys(TABLES)) out[key] = (data[key] || []).map((r) => TABLES[key].computed(r, data));
+    return out;
+  }, [data]);
+
+  const dash = useMemo(() => computeDash(computedRows), [computedRows]);
+  const sourceSummary = useMemo(() => computeSourceSummary(computedRows), [computedRows]);
+
+  const partnersDistribution = useMemo(() => {
+    const netFarm = sourceSummary.farm.net;
+    const partners = data.partners || [];
+    const pctSum = partners.reduce((s, p) => s + num(p.pct), 0);
+    const withdrawals = data.withdrawals || [];
+    const valueOf = (w) => (w.type === "علب دبس" ? num(w.qty) * DEFAULT_BOX_PRICE : num(w.amount));
+    return {
+      netFarm, pctSum,
+      rows: partners.map((p) => {
+        const share = netFarm * (num(p.pct) / 100);
+        const withdrawn = withdrawals.filter((w) => w.partner_name === p.name).reduce((s, w) => s + valueOf(w), 0);
+        return { ...p, share, withdrawn, remaining: share - withdrawn };
+      }),
+    };
+  }, [data.partners, data.withdrawals, sourceSummary]);
+
+  const acceptIncoming = async (item) => {
+    const notesParts = [];
+    if (item.notes) notesParts.push(item.notes);
+    if (item.phone) notesParts.push(`هاتف: ${item.phone}`);
+    notesParts.push(item.fulfillment === "توصيل" ? "توصيل" : "استلام");
+    if (item.fulfillment === "توصيل") {
+      const addr = [item.emirate, item.area, item.house_number ? `منزل ${item.house_number}` : "", item.delivery_location]
+        .filter(Boolean).join(" - ");
+      if (addr) notesParts.push(addr);
+      if (num(item.delivery_fee) > 0) notesParts.push(`رسوم توصيل: ${fmt(num(item.delivery_fee))}`);
+    }
+    notesParts.push("(عبر الرابط الإلكتروني)");
+
+    // نفتح نافذة واتساب مبكراً حتى لا يحجبها المتصفح بعد انتظار الشبكة
+    const wa = waLink(item.phone, item);
+    const waWin = wa ? window.open("", "_blank") : null;
+
+    try {
+      const created = await insertRow("orders", { order_date: todayISO(), customer_name: item.name, qty_requested: item.qty, notes: notesParts.join(" — ") });
+      await supabase.from("incoming_orders")
+        .update({ status: "accepted", linked_order_id: created ? created.id : null })
+        .eq("id", item.id);
+    } catch (err) {
+      console.error(err);
+      if (waWin) waWin.close();
+      showToast("تعذّر قبول الطلب، حاول مرة أخرى");
+      return;
+    }
+
+    setIncoming((list) => list.filter((x) => x.id !== item.id));
+    await loadAll();
+
+    if (waWin) {
+      waWin.location.href = wa;
+      showToast("تم قبول الطلب — أرسل التأكيد للعميل");
+    } else if (wa) {
+      window.location.href = wa;
+    } else {
+      showToast("تم قبول الطلب (لا يوجد رقم تواصل)");
+    }
+  };
+  const cancelIncoming = async (item) => {
+    if (!window.confirm(`تأكيد إلغاء طلب ${item.name}؟\nسينتقل إلى قائمة الطلبات الملغاة.`)) return;
+    await supabase.from("incoming_orders").update({ status: "cancelled" }).eq("id", item.id);
+    setIncoming((list) => list.filter((x) => x.id !== item.id));
+    setCancelled((list) => [{ ...item, status: "cancelled" }, ...list]);
+    showToast("تم إلغاء الطلب — أرسل إشعاراً للعميل من قائمة الملغاة");
+  };
+
+  const logout = async () => { await supabase.auth.signOut(); };
+
+  if (!loaded) {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg }}><div style={{ color: COLORS.inkSoft }}>جارِ تحميل البيانات…</div></div>;
+  }
+
+  return (
+    <div dir="rtl" style={{ minHeight: "100vh", background: COLORS.bg, color: COLORS.ink }}>
+      <header style={{ background: `linear-gradient(135deg, ${COLORS.deep}, #3A1C0C)`, color: "#F3E9D8", padding: "20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <LogoMark size={42} light />
+          <div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19 }}>{BRAND_NAME}</div>
+            <div style={{ fontSize: 11.5, color: "#D8C4A8" }}>{session.user.email}</div>
+          </div>
+        </div>
+        <button onClick={logout} style={{ ...ghostBtnStyle, background: "rgba(255,255,255,.1)", color: "#F3E9D8", border: "1px solid rgba(255,255,255,.25)" }}>تسجيل خروج</button>
+      </header>
+
+      <nav style={{ background: COLORS.surface, borderBottom: `1px solid ${COLORS.line}`, overflowX: "auto", position: "sticky", top: 0, zIndex: 5 }}>
+        <div style={{ display: "flex", gap: 4, padding: "6px 12px" }}>
+          {TAB_ORDER.map((key) => {
+            const meta = TABLES[key] ? { label: TABLES[key].label, icon: TABLES[key].icon } : TAB_META[key];
+            const active = tab === key;
+            const badge = key === "orders" && incoming.length > 0 ? incoming.length : 0;
+            return (
+              <button key={key} onClick={() => setTab(key)} style={{ position: "relative", flex: "0 0 auto", padding: "9px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 13.5, fontWeight: active ? 700 : 500, background: active ? COLORS.primary : "transparent", color: active ? "#fff" : COLORS.inkSoft }}>
+                {meta.icon} {meta.label}
+                {badge > 0 && (
+                  <span style={{
+                    position: "absolute", top: 2, insetInlineEnd: 2, minWidth: 18, height: 18,
+                    borderRadius: 9, background: COLORS.alert, color: "#fff", fontSize: 11, fontWeight: 800,
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 5px",
+                  }}>{badge}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "18px 16px 60px" }}>
+        {tab === "dashboard" && <Dashboard dash={dash} />}
+        {tab === "sources" && <SourceSummary summary={sourceSummary} />}
+        {tab === "partners" && <Partners partners={data.partners} distribution={partnersDistribution} withdrawals={data.withdrawals} boughtNet={sourceSummary.bought.net} onReload={loadAll} showToast={showToast} />}
+        {tab === "orders" && (
+          <IncomingOrders incoming={incoming} cancelled={cancelled} onAccept={acceptIncoming} onCancel={cancelIncoming} ordersOpen={ordersOpen} onToggleOrders={toggleOrders} onReload={loadAll} />
+        )}
+        {Object.keys(TABLES).includes(tab) && (
+          <DataTable tableKey={tab} config={TABLES[tab]} rows={computedRows[tab] || []} ordersRows={tab === "sales" ? computedRows.orders : undefined} onReload={loadAll} showToast={showToast} />
+        )}
+      </main>
+
+      {toast && <div style={{ position: "fixed", bottom: 20, insetInlineStart: "50%", transform: "translateX(50%)", background: COLORS.deep, color: "#F3E9D8", padding: "10px 18px", borderRadius: 10, fontSize: 13 }}>{toast}</div>}
+    </div>
+  );
+}
+
+function StatCard({ label, value, accent, icon }) {
+  return (
+    <div style={{ background: COLORS.surface, borderRadius: 14, padding: "16px 18px", border: `1px solid ${COLORS.line}`, borderInlineStart: `4px solid ${accent || COLORS.primary}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 12.5, color: COLORS.inkSoft, fontWeight: 500 }}>{label}</div>
+        <span>{icon}</span>
+      </div>
+      <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22, marginTop: 6, color: accent || COLORS.ink }}>{value}</div>
+    </div>
+  );
+}
+function SectionTitle({ title, subtitle }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, margin: 0, color: COLORS.deep }}>{title}</h2>
+      {subtitle && <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginTop: 2 }}>{subtitle}</div>}
+    </div>
+  );
+}
+
+function Dashboard({ dash }) {
+  return (
+    <div>
+      <div style={{ background: `linear-gradient(135deg, ${COLORS.deep}, #3A1C0C)`, borderRadius: 16, padding: 22, marginBottom: 24, color: "#F3E9D8" }}>
+        <div style={{ fontSize: 12.5, color: "#D8C4A8" }}>صافي الربح / العائد</div>
+        <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 32, color: dash.netProfit >= 0 ? "#B9D189" : "#E8A79C" }}>{fmt(dash.netProfit)}</div>
+      </div>
+      <SectionTitle title="الإنتاج" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 26 }}>
+        <StatCard label="أكياس المزرعة" value={fmt(dash.bagsFarm)} icon="🌴" accent={COLORS.secondary} />
+        <StatCard label="أكياس مشتراة" value={fmt(dash.bagsBought)} icon="🧺" />
+        <StatCard label="علب المزرعة" value={fmt(dash.boxesFarm)} icon="📦" accent={COLORS.secondary} />
+        <StatCard label="علب مشتراة" value={fmt(dash.boxesBought)} icon="📦" />
+        <StatCard label="إجمالي الدبس (كجم)" value={fmt(dash.totalDibs)} icon="🍯" />
+        <StatCard label="النفيعة (جوال)" value={fmt(dash.nafiaSacks)} icon="🌿" />
+      </div>
+      <SectionTitle title="الإيرادات والتكاليف" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+        <StatCard label="إيراد المبيعات" value={fmt(dash.salesRevenue)} icon="💵" />
+        <StatCard label="إيراد النفيعة" value={fmt(dash.nafiaRevenue)} icon="💵" />
+        <StatCard label="إجمالي الإيرادات" value={fmt(dash.totalRevenue)} icon="📈" accent={COLORS.secondary} />
+        <StatCard label="إجمالي التكاليف" value={fmt(dash.totalCosts)} icon="📉" accent={COLORS.alert} />
+      </div>
+    </div>
+  );
+}
+
+function SourceSummary({ summary }) {
+  const rows = [
+    { label: "الأكياس", key: "bagsCount" }, { label: "العلب", key: "boxes" },
+    { label: "صناديق مشتراة", key: "purchasedBoxes" }, { label: "نخيل مشتراة", key: "purchasedPalms" },
+    { label: "إيراد المبيعات", key: "salesRev" }, { label: "إيراد النفيعة", key: "nafiaRev" },
+    { label: "التكاليف", key: "cost" }, { label: "صافي العائد", key: "net", bold: true },
+  ];
+  return (
+    <div>
+      <SectionTitle title="ملخص المصادر" />
+      <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, overflow: "hidden" }}>
+        <table>
+          <thead><tr><th>المؤشر</th><th>إنتاج المزرعة</th><th>تمور مشتراة</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td style={{ fontWeight: 600 }}>{r.label}</td>
+                <td style={{ fontWeight: r.bold ? 800 : 400, color: r.bold ? (summary.farm[r.key] >= 0 ? COLORS.secondary : COLORS.alert) : COLORS.ink }}>{fmt(summary.farm[r.key])}</td>
+                <td style={{ fontWeight: r.bold ? 800 : 400, color: r.bold ? (summary.bought[r.key] >= 0 ? COLORS.secondary : COLORS.alert) : COLORS.ink }}>{fmt(summary.bought[r.key])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function siteBase() {
+  return window.location.href.split("#")[0];
+}
+
+function intlPhone(phone) {
+  const digits = String(phone || "").replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  return digits.startsWith("00") ? digits.slice(2)
+    : digits.startsWith("971") ? digits
+    : digits.startsWith("0") ? "971" + digits.slice(1)
+    : digits;
+}
+
+/* رسالة تأكيد استلام الطلب */
+function waLink(phone, item) {
+  const intl = intlPhone(phone);
+  if (!intl) return "";
+  const boxes = num(item.qty);
+  const fee = num(item.delivery_fee);
+  const total = boxes * DEFAULT_BOX_PRICE + fee;
+  const lines = [
+    `مرحباً ${item.first_name || item.name || ""} 👋`,
+    "",
+    "نشكر لكم طلبكم من مزرعتنا، ونفيدكم بأنه تم استلامه بنجاح.",
+    "",
+    `🔖 رقم الطلب: ${item.order_code || "-"}`,
+    "",
+    "تفاصيل الطلب:",
+    `• الكمية: ${fmt(boxes)} علبة (${fmt(boxes * BOX_SIZE_KG)} كجم)`,
+    `• طريقة الاستلام: ${item.fulfillment || "استلام"}`,
+  ];
+  if (fee > 0) lines.push(`• رسوم التوصيل: ${fmt(fee)} درهم`);
+  lines.push(`• الإجمالي: ${fmt(total)} درهم`);
+  lines.push("");
+  lines.push("💵 الدفع عند الاستلام.");
+  lines.push("");
+  if (item.fulfillment === "توصيل") {
+    lines.push("📍 نرجو مشاركة موقعكم عبر واتساب (Location) مع رقم المنزل، لتسهيل وصول المندوب إليكم.");
+    lines.push("");
+  }
+  lines.push("نظراً لأن الإنتاج طبيعي ويعتمد على عوامل عدة، سيتم التواصل معكم لتحديد موعد التسليم فور توفر الكمية بإذن الله.");
+  lines.push("");
+  lines.push("لإلغاء الطلب في أي وقت، اضغط الرابط التالي (مع ذكر السبب إن رغبتم):");
+  lines.push(`${siteBase()}#cancel=${item.order_code || ""}`);
+  lines.push("");
+  lines.push("شاكرين لكم حسن تعاملكم 🌴");
+  return `https://wa.me/${intl}?text=${encodeURIComponent(lines.join("\n"))}`;
+}
+
+/* رسالة إشعار بإلغاء الطلب */
+function waCancelLink(phone, item) {
+  const intl = intlPhone(phone);
+  if (!intl) return "";
+  const lines = [
+    `مرحباً ${item.first_name || item.name || ""} 👋`,
+    "",
+    `نفيدكم بأنه تم إلغاء طلبكم رقم ${item.order_code || "-"} (${fmt(num(item.qty))} علبة).`,
+    "",
+    "نعتذر عن أي إزعاج، ويسعدنا استقبال طلبكم مرة أخرى في أي وقت.",
+    "",
+    "شاكرين لكم تفهمكم 🌴",
+  ];
+  return `https://wa.me/${intl}?text=${encodeURIComponent(lines.join("\n"))}`;
+}
+
+function IncomingOrders({ incoming, cancelled, onAccept, onCancel, ordersOpen, onToggleOrders, onReload }) {
+  const [view, setView] = useState("pending");
+  const [q, setQ] = useState("");
+  const base = view === "pending" ? incoming : cancelled;
+  const list = q.trim()
+    ? base.filter((o) => {
+        const s = q.trim().toLowerCase();
+        return String(o.order_code || "").toLowerCase().includes(s)
+          || String(o.name || "").toLowerCase().includes(s)
+          || String(o.phone || "").includes(s);
+      })
+    : base;
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+        <SectionTitle title="الطلبات الإلكترونية" subtitle={incoming.length ? `${incoming.length} بانتظار المراجعة` : "لا توجد طلبات جديدة"} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={onReload} style={ghostBtnStyle}>🔄 تحديث</button>
+          <button onClick={onToggleOrders} style={{
+            padding: "9px 14px", borderRadius: 10, cursor: "pointer", fontSize: 12.5, fontWeight: 700,
+            border: `1px solid ${ordersOpen ? COLORS.alert : COLORS.secondary}`,
+            background: ordersOpen ? "#fff" : COLORS.secondary,
+            color: ordersOpen ? COLORS.alert : "#fff",
+          }}>
+            {ordersOpen ? "⏸️ إيقاف الطلبات" : "▶️ فتح الطلبات"}
+          </button>
+        </div>
+      </div>
+
+      {!ordersOpen && (
+        <div style={{ background: COLORS.amberLight, borderRadius: 12, padding: "10px 14px", fontSize: 12.5, color: COLORS.deep, marginBottom: 14 }}>
+          استقبال الطلبات متوقف حالياً — يظهر للعملاء في الرابط: «نفذت الكمية».
+        </div>
+      )}
+
+      <input value={q} onChange={(e) => setQ(e.target.value)}
+        placeholder="🔎 ابحث برقم الطلب أو الاسم أو الجوال"
+        style={{ ...inputStyle, marginBottom: 12 }} />
+
+      {/* تبديل العرض */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[
+          { k: "pending", label: `الواردة (${incoming.length})` },
+          { k: "cancelled", label: `الملغاة (${cancelled.length})` },
+        ].map((t) => (
+          <button key={t.k} onClick={() => setView(t.k)} style={{
+            padding: "8px 16px", borderRadius: 20, cursor: "pointer", fontSize: 12.5,
+            fontWeight: view === t.k ? 700 : 500, border: `1px solid ${COLORS.line}`,
+            background: view === t.k ? COLORS.deep : "#fff",
+            color: view === t.k ? "#F3E9D8" : COLORS.inkSoft,
+          }}>{t.label}</button>
+        ))}
+      </div>
+
+      {list.length === 0 ? (
+        <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, padding: "30px 16px", textAlign: "center", color: COLORS.inkSoft, fontSize: 13.5 }}>
+          {view === "pending" ? "لا توجد طلبات واردة حالياً." : "لا توجد طلبات ملغاة."}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {list.map((item) => {
+            const isCancelled = view === "cancelled";
+            const wa = isCancelled ? waCancelLink(item.phone, item) : waLink(item.phone, item);
+            const fee = num(item.delivery_fee);
+            const total = num(item.qty) * DEFAULT_BOX_PRICE + fee;
+            return (
+              <div key={item.id} style={{
+                background: COLORS.surface, borderRadius: 12, border: `1px solid ${COLORS.line}`,
+                borderInlineStart: `4px solid ${isCancelled ? COLORS.alert : COLORS.primary}`,
+                padding: "12px 14px", opacity: isCancelled ? 0.85 : 1,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ flex: "1 1 200px" }}>
+                    <div style={{ fontSize: 11, color: COLORS.primary, fontWeight: 800, letterSpacing: 0.5, marginBottom: 2 }}>
+                      🔖 {item.order_code || "-"}
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                      {item.name}
+                      {isCancelled && (
+                        <span style={{ marginInlineStart: 8, fontSize: 11, color: COLORS.alert, fontWeight: 700 }}>
+                          · ملغى{item.cancelled_by ? ` من ${item.cancelled_by}` : ""}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.9, marginTop: 3 }}>
+                      {fmt(item.qty)} علبة — {item.fulfillment || "استلام"}
+                      {fee > 0 ? ` — توصيل ${fmt(fee)} درهم` : ""}
+                      <br />
+                      <b style={{ color: COLORS.deep }}>الإجمالي: {fmt(total)} درهم</b>
+                      <span style={{ color: COLORS.secondary, fontWeight: 700 }}> · الدفع عند الاستلام</span>
+                      {item.phone ? <><br />📞 {item.phone}</> : null}
+                      {item.fulfillment === "توصيل" && (() => {
+                        const loc = String(item.delivery_location || "");
+                        const url = (loc.match(/https?:\/\/\S+/) || [])[0] || "";
+                        const desc = loc.replace(url, "").replace(/^\s*\|\s*/, "").trim();
+                        return (
+                          <><br />📍 {item.emirate} — {item.area} — منزل {item.house_number}
+                          {url && (
+                            <><br />
+                              <a href={url} target="_blank" rel="noopener noreferrer"
+                                style={{ color: COLORS.primary, fontWeight: 700, textDecoration: "none" }}>
+                                🗺️ فتح الموقع في الخرائط
+                              </a>
+                            </>
+                          )}
+                          {desc ? <><br />📝 {desc}</> : null}</>
+                        );
+                      })()}
+                      {item.notes ? <><br />📝 {item.notes}</> : null}
+                      {item.cancel_reason ? <><br /><span style={{ color: COLORS.alert }}>✕ سبب الإلغاء: {item.cancel_reason}</span></> : null}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {isCancelled ? (
+                      wa && (
+                        <a href={wa} target="_blank" rel="noopener noreferrer"
+                          style={{ ...primaryBtnStyle, background: "#25D366", textDecoration: "none", display: "inline-block" }}>
+                          إشعار الإلغاء
+                        </a>
+                      )
+                    ) : (
+                      <>
+                        <button onClick={() => onAccept(item)}
+                          style={{ ...primaryBtnStyle, background: "#25D366" }}>
+                          ✓ قبول وإرسال التأكيد
+                        </button>
+                        <button onClick={() => onCancel(item)} style={{ ...ghostBtnStyle, color: COLORS.alert, borderColor: COLORS.alert }}>إلغاء الطلب</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Partners({ partners, distribution, withdrawals, boughtNet, onReload, showToast }) {
+  const [wForm, setWForm] = useState({ date: todayISO(), partner_name: "", type: "نقدي", qty: "", amount: "", notes: "" });
+  const [showForm, setShowForm] = useState(false);
+
+  const updatePartner = async (p, field, value) => {
+    await updateRow("partners", p.id, { [field]: field === "pct" ? num(value) : value });
+    onReload();
+  };
+  const addPartner = async () => { await insertRow("partners", { name: `شريك ${partners.length + 1}`, pct: 0 }); onReload(); };
+  const removePartner = async (id) => { await deleteRow("partners", id); onReload(); };
+
+  const submitW = async (e) => {
+    e.preventDefault();
+    await insertRow("withdrawals", { date: wForm.date, partner_name: wForm.partner_name, type: wForm.type, qty: wForm.type === "علب دبس" ? num(wForm.qty) : null, amount: wForm.type === "نقدي" ? num(wForm.amount) : null, notes: wForm.notes });
+    setWForm({ date: todayISO(), partner_name: "", type: "نقدي", qty: "", amount: "", notes: "" });
+    setShowForm(false);
+    onReload();
+    showToast("تم تسجيل السحب");
+  };
+  const removeW = async (id) => { await deleteRow("withdrawals", id); onReload(); showToast("تم الحذف"); };
+  const valueOf = (w) => (w.type === "علب دبس" ? num(w.qty) * DEFAULT_BOX_PRICE : num(w.amount));
+
+  return (
+    <div>
+      <SectionTitle title="توزيع أرباح إنتاج المزرعة" />
+      <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+        {partners.map((p, i) => {
+          const row = distribution.rows[i] || { share: 0, withdrawn: 0, remaining: 0 };
+          return (
+            <div key={p.id} style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, padding: 14 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <input defaultValue={p.name} onBlur={(e) => updatePartner(p, "name", e.target.value)} style={{ ...inputStyle, flex: "1 1 140px" }} />
+                <input type="number" defaultValue={p.pct} onBlur={(e) => updatePartner(p, "pct", e.target.value)} style={{ ...inputStyle, width: 80 }} />
+                <span style={{ fontSize: 13 }}>%</span>
+                <button onClick={() => removePartner(p.id)} style={dangerBtnStyle}>حذف</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginTop: 10, fontSize: 12.5 }}>
+                <div><div style={{ color: COLORS.inkSoft }}>المستحق</div><div style={{ fontWeight: 700, color: COLORS.secondary }}>{fmt(row.share)}</div></div>
+                <div><div style={{ color: COLORS.inkSoft }}>المسحوب</div><div style={{ fontWeight: 700, color: COLORS.primary }}>{fmt(row.withdrawn)}</div></div>
+                <div><div style={{ color: COLORS.inkSoft }}>المتبقي</div><div style={{ fontWeight: 800, color: row.remaining >= 0 ? COLORS.secondary : COLORS.alert }}>{fmt(row.remaining)}</div></div>
+              </div>
+            </div>
+          );
+        })}
+        <button onClick={addPartner} style={primaryBtnStyle}>+ إضافة شريك</button>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+        <SectionTitle title="سحوبات الشركاء" />
+        <button onClick={() => setShowForm((v) => !v)} style={primaryBtnStyle}>+ تسجيل سحب</button>
+      </div>
+      {showForm && (
+        <form onSubmit={submitW} style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10 }}>
+            <input type="date" value={wForm.date} onChange={(e) => setWForm((f) => ({ ...f, date: e.target.value }))} style={inputStyle} />
+            <select value={wForm.partner_name} onChange={(e) => setWForm((f) => ({ ...f, partner_name: e.target.value }))} style={inputStyle}>
+              <option value="">— الشريك —</option>
+              {partners.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+            </select>
+            <select value={wForm.type} onChange={(e) => setWForm((f) => ({ ...f, type: e.target.value }))} style={inputStyle}>
+              {WITHDRAWAL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            {wForm.type === "علب دبس" ? (
+              <input type="number" placeholder="الكمية (علبة)" value={wForm.qty} onChange={(e) => setWForm((f) => ({ ...f, qty: e.target.value }))} style={inputStyle} />
+            ) : (
+              <input type="number" placeholder="المبلغ" value={wForm.amount} onChange={(e) => setWForm((f) => ({ ...f, amount: e.target.value }))} style={inputStyle} />
+            )}
+            <input placeholder="ملاحظات" value={wForm.notes} onChange={(e) => setWForm((f) => ({ ...f, notes: e.target.value }))} style={inputStyle} />
+          </div>
+          <button type="submit" style={{ ...primaryBtnStyle, marginTop: 12 }}>تسجيل</button>
+        </form>
+      )}
+      <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, overflow: "auto" }}>
+        <table>
+          <thead><tr><th>التاريخ</th><th>الشريك</th><th>النوع</th><th>الكمية/المبلغ</th><th>القيمة</th><th></th></tr></thead>
+          <tbody>
+            {(withdrawals || []).map((w) => (
+              <tr key={w.id}>
+                <td>{w.date}</td><td>{w.partner_name}</td><td>{w.type}</td>
+                <td>{w.type === "علب دبس" ? `${fmt(w.qty)} علبة` : fmt(w.amount)}</td>
+                <td style={{ fontWeight: 700, color: COLORS.primary }}>{fmt(valueOf(w))}</td>
+                <td><button onClick={() => removeW(w.id)} style={dangerBtnStyle}>حذف</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <SectionTitle title="أرباح التمور المشتراة" subtitle="تعود بالكامل لناصر" />
+        <StatCard label="صافي العائد" value={fmt(boughtNet)} icon="🤝" accent={boughtNet >= 0 ? COLORS.secondary : COLORS.alert} />
+      </div>
+    </div>
+  );
+}
+
+function emptyForm(config) {
+  const f = {};
+  config.columns.forEach((c) => { f[c.key] = c.default !== undefined ? c.default : c.type === "date" ? todayISO() : ""; });
+  return f;
+}
+
+function DataTable({ tableKey, config, rows, ordersRows, onReload, showToast }) {
+  const [form, setForm] = useState(emptyForm(config));
+  const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => { setForm(emptyForm(config)); setEditingId(null); setShowForm(false); }, [tableKey]);
+
+  const resetForm = () => { setForm(emptyForm(config)); setEditingId(null); setShowForm(false); };
+  const startEdit = (row) => {
+    const f = emptyForm(config);
+    config.columns.forEach((c) => { if (row[c.key] !== undefined && row[c.key] !== null) f[c.key] = row[c.key]; });
+    setForm(f); setEditingId(row.id); setShowForm(true);
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const payload = {};
+    config.columns.forEach((c) => {
+      let v = form[c.key];
+      if (c.type === "number") v = v === "" ? null : num(v);
+      if (v === "") v = null;
+      payload[c.key] = v;
+    });
+    try {
+      if (editingId != null) { await updateRow(config.table, editingId, payload); showToast("تم حفظ التعديل"); }
+      else { await insertRow(config.table, payload); showToast("تمت الإضافة"); }
+      resetForm();
+      onReload();
+    } catch (err) { console.error(err); showToast("حدث خطأ، حاول مرة أخرى"); }
+  };
+  const remove = async (id) => { await deleteRow(config.table, id); onReload(); showToast("تم الحذف"); };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <SectionTitle title={config.label} subtitle={`${rows.length} سجل`} />
+        <button style={primaryBtnStyle} onClick={() => { resetForm(); setShowForm(true); }}>+ إضافة</button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={submit} style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10 }}>
+            {config.columns.map((c) => (
+              <label key={c.key} style={{ fontSize: 12, color: COLORS.inkSoft }}>
+                {c.label}
+                {c.type === "select" ? (
+                  <select value={form[c.key] ?? ""} onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} required={c.required}>
+                    <option value="">— اختر —</option>
+                    {c.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : c.type === "orderLink" ? (
+                  <select value={form[c.key] ?? ""} onChange={(e) => {
+                    const orderId = e.target.value ? parseInt(e.target.value) : "";
+                    const order = (ordersRows || []).find((o) => o.id === orderId);
+                    setForm((f) => ({ ...f, [c.key]: orderId, customer: order ? order.customer_name : f.customer }));
+                  }} style={{ ...inputStyle, marginTop: 4 }}>
+                    <option value="">بدون طلب (بيع مباشر)</option>
+                    {(ordersRows || []).map((o) => <option key={o.id} value={o.id}>#{o.id} — {o.customer_name} (متبقٍ {fmt(o.remaining)})</option>)}
+                  </select>
+                ) : (
+                  <input type={c.type === "number" ? "number" : c.type === "date" ? "date" : "text"} value={form[c.key] ?? ""} onChange={(e) => setForm((f) => ({ ...f, [c.key]: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} required={c.required} />
+                )}
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            <button type="submit" style={primaryBtnStyle}>{editingId != null ? "حفظ" : "إضافة"}</button>
+            <button type="button" onClick={resetForm} style={ghostBtnStyle}>إلغاء</button>
+          </div>
+        </form>
+      )}
+
+      <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, overflow: "auto" }}>
+        {rows.length === 0 ? (
+          <div style={{ padding: "30px 16px", textAlign: "center", color: COLORS.inkSoft, fontSize: 13.5 }}>لا توجد سجلات بعد.</div>
+        ) : (
+          <table>
+            <thead><tr>{config.display.map((c) => <th key={c}>{config.columns.find((cc) => cc.key === c)?.label || c}</th>)}<th></th></tr></thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  {config.display.map((c) => (
+                    <td key={c}>{typeof row[c] === "number" ? fmt(row[c], Number.isInteger(row[c]) ? 0 : 2) : (row[c] ?? "")}</td>
+                  ))}
+                  <td>
+                    <button onClick={() => startEdit(row)} style={{ ...dangerBtnStyle, color: COLORS.primary }}>تعديل</button>
+                    <button onClick={() => remove(row.id)} style={dangerBtnStyle}>حذف</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============ الجذر: تسجيل الدخول / رابط العميل / التطبيق ============ */
+function Root() {
+  const [session, setSession] = useState(undefined);
+  const [hash, setHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  if (hash.startsWith("#cancel")) {
+    const t = (hash.split("=")[1] || "").trim();
+    return <CancelOrderPage token={t} />;
+  }
+  if (hash === "#story") return <StoryPage />;
+  if (hash === "#order") return <CustomerOrderForm />;
+  if (session === undefined) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg }}>جارِ التحقق…</div>;
+  if (!session) return <LoginScreen />;
+  return <MainApp session={session} />;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Root />);
+</script>
+</body>
+</html>
