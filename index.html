@@ -645,7 +645,7 @@ function CustomerOrderForm() {
 
 /* ============ صفحة إلغاء الطلب (للعميل عبر رابط خاص) ============ */
 
-function CancelOrderPage({ orderId }) {
+function CancelOrderPage({ token }) {
   const [order, setOrder] = useState(undefined);
   const [reason, setReason] = useState("");
   const [status, setStatus] = useState("idle"); // idle | saving | done | error
@@ -653,20 +653,19 @@ function CancelOrderPage({ orderId }) {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.from("incoming_orders").select("*").eq("id", orderId).maybeSingle();
-      if (error || !data) { setOrder(null); return; }
-      setOrder(data);
+      const { data, error } = await supabase.rpc("get_order_by_token", { p_token: token });
+      if (error || !data || !data.length) { setOrder(null); return; }
+      setOrder(data[0]);
     })();
-  }, [orderId]);
+  }, [token]);
 
   const confirmCancel = async () => {
     setStatus("saving");
-    const { error } = await supabase.from("incoming_orders")
-      .update({ status: "cancelled", cancel_reason: reason || null, cancelled_by: "العميل" })
-      .eq("id", orderId).eq("status", "pending");
+    const { data, error } = await supabase.rpc("cancel_order_by_token", { p_token: token, p_reason: reason || null });
     if (error) { setErrMsg(error.message || "تعذّر إلغاء الطلب"); setStatus("error"); return; }
-    setOrder((o) => ({ ...o, status: "cancelled" }));
-    setStatus("done");
+    if (data === "not_found") { setOrder(null); return; }
+    setOrder((o) => ({ ...o, status: data === "cancelled" ? "cancelled" : data }));
+    setStatus(data === "cancelled" ? "done" : "idle");
   };
 
   const wrap = { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
@@ -1002,31 +1001,27 @@ function StoryPage() {
         </div>
       </div>
 
-      {/* ===== الخاتمة ===== */}
-      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "50px 20px" }}>
-        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
-          <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 24, margin: "0 0 16px", lineHeight: 1.5 }}>
-            ليش ما نستعجل؟
+      {/* ===== الطلب ===== */}
+      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "56px 20px" }}>
+        <div style={{ maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
+          <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 26, margin: "0 0 12px", lineHeight: 1.5 }}>
+            موسم واحد في السنة
           </h2>
-          <p style={{ fontSize: 15, lineHeight: 2.3, color: "#E3D3BB", margin: 0 }}>
-            الكمية محدودة، لأنها مربوطة بموسم واحد في السنة.
-            والوقت اللي تاخذه المدبسة ما نقدر نختصره — لو استعجلنا، يتغير الطعم.
-            <br /><br />
-            <b style={{ color: "#FBF6EC" }}>
-              نفضّل ننتج أقل، ويطلع الدبس كما عرفناه من أهلنا.
-            </b>
+          <p style={{ fontSize: 14.5, lineHeight: 2.1, color: "#E3D3BB", margin: "0 0 28px" }}>
+            الكمية محدودة بما تعطيه النخلة — احجز نصيبك قبل نفادها.
           </p>
+          <a href="#order" style={{
+            display: "inline-block", textDecoration: "none", padding: "16px 52px",
+            fontSize: 16, fontWeight: 800, borderRadius: 12,
+            background: COLORS.primary, color: "#fff",
+            fontFamily: "Cairo, sans-serif",
+          }}>
+            اطلب الآن
+          </a>
+          <div style={{ fontSize: 12.5, color: "#C9B393", marginTop: 16 }}>
+            الدفع عند الاستلام · توصيل لجميع الإمارات
+          </div>
         </div>
-      </div>
-
-      {/* ===== المختبر + الطلب ===== */}
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px 60px", textAlign: "center" }}>
-        <div style={{ fontSize: 13, color: COLORS.inkSoft, lineHeight: 2, marginBottom: 26 }}>
-          🧪 جارٍ تجهيز عيّنات لإرسالها إلى المختبرات الغذائية المعتمدة لتوثيق القيمة الغذائية — وسنشارككم النتائج فور صدورها.
-        </div>
-        <a href="#order" style={{ ...primaryBtnStyle, display: "inline-block", textDecoration: "none", padding: "15px 46px", fontSize: 15.5, borderRadius: 12 }}>
-          اطلب الآن
-        </a>
       </div>
     </div>
   );
@@ -1299,7 +1294,7 @@ function waLink(phone, item) {
   lines.push("نظراً لأن الإنتاج طبيعي ويعتمد على عوامل عدة، سيتم التواصل معكم لتحديد موعد التسليم فور توفر الكمية بإذن الله.");
   lines.push("");
   lines.push("لإلغاء الطلب في أي وقت، اضغط الرابط التالي (مع ذكر السبب إن رغبتم):");
-  lines.push(`${siteBase()}#cancel=${item.id}`);
+  lines.push(`${siteBase()}#cancel=${item.token || ""}`);
   lines.push("");
   lines.push("شاكرين لكم حسن تعاملكم 🌴");
   return `https://wa.me/${intl}?text=${encodeURIComponent(lines.join("\n"))}`;
@@ -1659,8 +1654,8 @@ function Root() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  const cancelMatch = hash.match(/^#cancel=(\d+)$/);
-  if (cancelMatch) return <CancelOrderPage orderId={cancelMatch[1]} />;
+  const cancelMatch = hash.match(/^#cancel=([a-zA-Z0-9]+)$/);
+  if (cancelMatch) return <CancelOrderPage token={cancelMatch[1]} />;
   if (hash === "#story") return <StoryPage />;
   if (hash === "#order") return <CustomerOrderForm />;
   if (session === undefined) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg }}>جارِ التحقق…</div>;
