@@ -459,16 +459,38 @@ function CustomerOrderForm() {
     }
   };
 
-  const card = { maxWidth: 460, width: "100%", background: COLORS.surface, borderRadius: 18, padding: 24, border: `1px solid ${COLORS.line}` };
-  const wrap = { minHeight: "100vh", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
+  const card = {
+    maxWidth: 460, width: "100%", position: "relative",
+    background: "rgba(255,255,255,0.94)", backdropFilter: "blur(10px)",
+    borderRadius: 22, padding: 26,
+    border: "1px solid rgba(255,255,255,0.6)",
+    boxShadow: "0 24px 60px rgba(43,27,18,.34)",
+  };
+  const wrap = {
+    minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+    padding: "28px 20px", position: "relative", overflow: "hidden",
+  };
+
+  /* خلفية النخيل مع تعتيم متدرّج */
+  const Backdrop = () => (
+    <>
+      <img src="palm.jpeg" alt="" aria-hidden="true"
+        style={{ position: "fixed", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: -2 }} />
+      <div aria-hidden="true" style={{
+        position: "fixed", inset: 0, zIndex: -1,
+        background: "linear-gradient(160deg, rgba(43,27,18,.62) 0%, rgba(74,37,17,.72) 55%, rgba(43,27,18,.86) 100%)",
+      }} />
+    </>
+  );
 
   if (ordersOpen === null) {
-    return <div dir="rtl" style={wrap}><div style={{ color: COLORS.inkSoft }}>جارٍ التحميل…</div></div>;
+    return <div dir="rtl" style={wrap}><Backdrop /><div style={{ color: "#F3E9D8" }}>جارٍ التحميل…</div></div>;
   }
 
   if (!ordersOpen) {
     return (
       <div dir="rtl" style={wrap}>
+        <Backdrop />
         <div style={{ ...card, textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🌴</div>
           <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep, marginBottom: 8 }}>
@@ -485,15 +507,20 @@ function CustomerOrderForm() {
 
   return (
     <div dir="rtl" style={wrap}>
+      <Backdrop />
       <div style={card}>
         <div style={{ marginBottom: 16 }}>
           <LogoLockup size={50} center />
         </div>
-        <div style={{ borderRadius: 14, overflow: "hidden", marginBottom: 16, position: "relative" }}>
-          <img src="pour.jpeg" alt="دبس التمر" style={{ width: "100%", height: 170, objectFit: "cover", display: "block" }} />
-          <span style={{ position: "absolute", top: 10, insetInlineStart: 10, background: "rgba(107,122,58,.92)", color: "#fff", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>
+        <div style={{ borderRadius: 16, overflow: "hidden", marginBottom: 18, position: "relative", boxShadow: "0 10px 26px rgba(74,37,17,.2)" }}>
+          <img src="pour.jpeg" alt="دبس التمر" style={{ width: "100%", height: 190, objectFit: "cover", display: "block" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(43,27,18,.55), rgba(43,27,18,0) 55%)" }} />
+          <span style={{ position: "absolute", top: 12, insetInlineStart: 12, background: "rgba(107,122,58,.95)", color: "#fff", borderRadius: 20, padding: "5px 13px", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>
             🌿 ORGANIC
           </span>
+          <div style={{ position: "absolute", bottom: 12, insetInlineStart: 14, color: "#FBF6EC", fontSize: 12.5, fontWeight: 700, textShadow: "0 1px 6px rgba(0,0,0,.5)" }}>
+            {BOX_SIZE_KG} كجم · {DEFAULT_BOX_PRICE} درهم للعلبة
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
           <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep }}>تسجيل طلب دبس</div>
@@ -503,10 +530,11 @@ function CustomerOrderForm() {
         </div>
         <a href="#story" style={{
           display: "block", textDecoration: "none", marginBottom: 18,
-          background: COLORS.amberLight, borderRadius: 12, padding: "10px 14px",
-          fontSize: 12.5, color: COLORS.deep, fontWeight: 700,
+          background: COLORS.amberLight, borderRadius: 12, padding: "11px 14px",
+          fontSize: 12.5, color: COLORS.deep, fontWeight: 700, textAlign: "center",
+          border: `1px solid ${COLORS.line}`,
         }}>
-          🌴 تعرّف على رحلة المنتج — من النخلة للمدبسة ←
+          🌴 رحلة المنتج — من النخلة للمدبسة ←
         </a>
 
         {status === "done" ? (
