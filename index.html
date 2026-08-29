@@ -208,13 +208,14 @@ const TABLES = {
     columns: [
       { key: "date", label: "التاريخ", type: "date" },
       { key: "recipient", label: "اسم المستلم", type: "text" },
+      { key: "source", label: "مصدر التمر", type: "select", options: SOURCE_OPTIONS, required: true },
       { key: "qty", label: "الكمية (علبة)", type: "number" },
       { key: "ref_cost", label: "التكلفة المرجعية/علبة", type: "number" },
       { key: "group_name", label: "المجموعة", type: "text" },
       { key: "notes", label: "ملاحظات", type: "text" },
     ],
     computed: (row) => ({ ...row, total: row.qty && row.ref_cost ? num(row.qty) * num(row.ref_cost) : "" }),
-    display: ["date", "recipient", "qty", "ref_cost", "total", "group_name", "notes"],
+    display: ["date", "recipient", "source", "qty", "ref_cost", "total", "group_name", "notes"],
   },
   costs: {
     label: "التكاليف", icon: "🧾", table: "costs",
@@ -1555,6 +1556,13 @@ function DeliveryPanel({ orders, sales, onReload, showToast, boxPrice }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 14 }}>
               {o.customer_name}
+              {String(o.notes || "").includes("عبر الرابط الإلكتروني") && (
+                <span style={{
+                  marginInlineStart: 6, fontSize: 10.5, fontWeight: 700,
+                  background: "rgba(76,107,47,.15)", color: COLORS.secondary,
+                  borderRadius: 20, padding: "2px 8px",
+                }}>🌐 إلكتروني</span>
+              )}
               {!done && del > 0 && (
                 <span style={{
                   marginInlineStart: 8, fontSize: 10.5, fontWeight: 800,
@@ -1969,22 +1977,38 @@ function MainApp({ session }) {
 
   const dash = useMemo(() => computeDash(filteredRows), [filteredRows]);
   const sourceSummary = useMemo(() => computeSourceSummary(filteredRows), [filteredRows]);
+  /* حسابات الشركاء تراكمية — لا تتأثر بفلتر التاريخ */
+  const sourceSummaryAll = useMemo(() => computeSourceSummary(computedRows), [computedRows]);
 
   const partnersDistribution = useMemo(() => {
-    const netFarm = sourceSummary.farm.net;
+    const netFarm = sourceSummaryAll.farm.net;
+    const farmBoxes = sourceSummaryAll.farm.boxes;   // علب إنتاج المزرعة
+    /* العطايا من إنتاج المزرعة — تُخصم من الإجمالي قبل التقسيم (بلا مصدر = تُعد من المزرعة) */
+    const farmGifts = (computedRows.gifts || [])
+      .filter((g) => !g.source || g.source === "إنتاج المزرعة")
+      .reduce((s, g) => s + num(g.qty), 0);
+    const netBoxes = farmBoxes - farmGifts;       // الصافي القابل للتوزيع
     const partners = data.partners || [];
     const pctSum = partners.reduce((s, p) => s + num(p.pct), 0);
     const withdrawals = data.withdrawals || [];
     const valueOf = (w) => (w.type === "علب دبس" ? num(w.qty) * DEFAULT_BOX_PRICE : num(w.amount));
     return {
-      netFarm, pctSum,
+      netFarm, pctSum, farmBoxes, farmGifts, netBoxes,
       rows: partners.map((p) => {
+        const mine = withdrawals.filter((w) => w.partner_name === p.name);
         const share = netFarm * (num(p.pct) / 100);
-        const withdrawn = withdrawals.filter((w) => w.partner_name === p.name).reduce((s, w) => s + valueOf(w), 0);
-        return { ...p, share, withdrawn, remaining: share - withdrawn };
+        const withdrawn = mine.reduce((s, w) => s + valueOf(w), 0);
+        /* نصيب الشريك من العلب بعد خصم العطايا */
+        const boxShare = netBoxes * (num(p.pct) / 100);
+        const giftCut = farmGifts * (num(p.pct) / 100);   // ما تحمّله من العطايا
+        const boxTaken = mine.filter((w) => w.type === "علب دبس").reduce((s, w) => s + num(w.qty), 0);
+        return {
+          ...p, share, withdrawn, remaining: share - withdrawn,
+          boxShare, giftCut, boxTaken, boxLeft: boxShare - boxTaken,
+        };
       }),
     };
-  }, [data.partners, data.withdrawals, sourceSummary]);
+  }, [data.partners, data.withdrawals, computedRows.gifts, sourceSummaryAll]);
 
   const acceptIncoming = async (item) => {
     const notesParts = [];
@@ -2083,14 +2107,14 @@ function MainApp({ session }) {
         {tab === "dashboard" && <Dashboard dash={dash} onReload={loadAll} />}
         {tab === "sources" && <SourceSummary summary={sourceSummary} />}
         {tab === "collect" && (
-          <CollectionsPanel sales={filteredRows.sales || []} onReload={loadAll} showToast={showToast} />
+          <CollectionsPanel sales={computedRows.sales || []} onReload={loadAll} showToast={showToast} />
         )}
-        {tab === "partners" && <Partners partners={data.partners} distribution={partnersDistribution} withdrawals={data.withdrawals} boughtNet={sourceSummary.bought.net} onReload={loadAll} showToast={showToast} />}
+        {tab === "partners" && <Partners partners={data.partners} distribution={partnersDistribution} withdrawals={data.withdrawals} boughtNet={sourceSummaryAll.bought.net} boxesRows={computedRows.boxes || []} boxPrice={boxPrice} onReload={loadAll} showToast={showToast} />}
         {tab === "orders" && (
-          <DeliveryPanel orders={filteredRows.orders || []} sales={filteredRows.sales || []} onReload={loadAll} showToast={showToast} boxPrice={boxPrice} />
+          <DeliveryPanel orders={computedRows.orders || []} sales={computedRows.sales || []} onReload={loadAll} showToast={showToast} boxPrice={boxPrice} />
         )}
         {tab === "orders" && (
-          <AllocationPanel orders={filteredRows.orders || []} available={dash.available} showToast={showToast} />
+          <AllocationPanel orders={computedRows.orders || []} available={dash.available} showToast={showToast} />
         )}
         {tab === "orders" && (
           <IncomingOrders incoming={incoming} cancelled={cancelled} onAccept={acceptIncoming} onCancel={cancelIncoming} ordersOpen={ordersOpen} onToggleOrders={toggleOrders} onReload={loadAll} />
@@ -2463,6 +2487,12 @@ function printPartnerStatement(partner, row, withdrawals) {
       <div class="card"><div class="l">المسحوب</div><div class="v" style="color:#B5651D">${fmt(row.withdrawn)}</div></div>
       <div class="card"><div class="l">المتبقي</div><div class="v" style="color:${row.remaining >= 0 ? "#6B7A3A" : "#A63A32"}">${fmt(row.remaining)}</div></div>
     </div>
+    <h3 style="font-family:Cairo;font-size:15px;margin:0 0 10px">نصيبه من العلب المنتجة</h3>
+    <div class="cards">
+      <div class="card"><div class="l">نصيبه من العلب</div><div class="v">${fmt(row.boxShare || 0, 1)} علبة</div></div>
+      <div class="card"><div class="l">استلم علب</div><div class="v" style="color:#B5651D">${fmt(row.boxTaken || 0)}</div></div>
+      <div class="card"><div class="l">باقي له</div><div class="v" style="color:${(row.boxLeft || 0) >= 0 ? "#6B7A3A" : "#A63A32"}">${fmt(row.boxLeft || 0, 1)} علبة</div></div>
+    </div>
     <h3 style="font-family:Cairo;font-size:15px;margin:0 0 10px">سجل السحوبات</h3>
     <table>
       <thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية/المبلغ</th><th>القيمة (درهم)</th><th>ملاحظات</th></tr></thead>
@@ -2481,7 +2511,182 @@ function printPartnerStatement(partner, row, withdrawals) {
   return true;
 }
 
-function Partners({ partners, distribution, withdrawals, boughtNet, onReload, showToast }) {
+/* ============ أنصبة الشركاء لكل قطفة ============ */
+
+function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice, showToast }) {
+  const [who, setWho] = useState("");   // "" = كل الشركاء
+
+  /* قطفات إنتاج المزرعة فقط، الأحدث أولاً */
+  const batches = useMemo(
+    () => (boxesRows || [])
+      .filter((b) => b.source === "إنتاج المزرعة" && num(b.box_count) > 0)
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))),
+    [boxesRows]
+  );
+
+  const totalBoxes = batches.reduce((s, b) => s + num(b.box_count), 0);
+  const gifts = num(farmGifts);
+  const netTotal = totalBoxes - gifts;   // بعد خصم العطايا
+  const shown = who ? partners.filter((p) => p.name === who) : partners;
+
+  /* نصيب شريك من قطفة */
+  const shareOf = (batch, p) => num(batch.box_count) * (num(p.pct) / 100);
+
+  /* ما استلمه الشريك فعلاً كعلب */
+  const takenOf = (p) => (withdrawals || [])
+    .filter((w) => w.partner_name === p.name && w.type === "علب دبس")
+    .reduce((s, w) => s + num(w.qty), 0);
+
+  const copyPlan = (p) => {
+    const lines = batches
+      .map((b) => `• ${b.date || "بدون تاريخ"}: ${fmt(shareOf(b, p), 1)} علبة (من ${fmt(b.box_count)})`)
+      .filter(Boolean);
+    if (!lines.length) { showToast("لا توجد قطفات مسجّلة"); return; }
+    const total = netTotal * (num(p.pct) / 100);
+    navigator.clipboard?.writeText([
+      `نصيب ${p.name} (${fmt(p.pct, 2)}%)`, "", ...lines, "",
+      `الإجمالي: ${fmt(total, 1)} علبة`,
+      `قيمتها لو بيعت: ${fmt(total * boxPrice)} درهم`,
+    ].join("\n"));
+    showToast(`تم نسخ كشف ${p.name}`);
+  };
+
+  if (!batches.length) {
+    return (
+      <div style={{
+        background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 14,
+        padding: "20px 16px", marginBottom: 18, textAlign: "center",
+        color: COLORS.inkSoft, fontSize: 13,
+      }}>
+        سجّل إنتاج علب من «إنتاج المزرعة» ليظهر نصيب كل شريك من كل قطفة.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <SectionTitle title="نصيب الشركاء من كل قطفة"
+        subtitle={`${batches.length} قطفة · ${fmt(totalBoxes)} علبة إنتاجاً${gifts > 0 ? ` · ${fmt(netTotal)} صافي بعد العطايا` : ""}`} />
+
+      {/* اختيار الشريك */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        <button onClick={() => setWho("")} style={{
+          ...ghostBtnStyle, padding: "7px 14px", fontSize: 12,
+          background: who === "" ? COLORS.deep : "#fff",
+          color: who === "" ? "#F3E9D8" : COLORS.inkSoft,
+          borderColor: who === "" ? COLORS.deep : COLORS.line,
+        }}>كل الشركاء</button>
+        {partners.map((p) => (
+          <button key={p.id} onClick={() => setWho(p.name)} style={{
+            ...ghostBtnStyle, padding: "7px 14px", fontSize: 12,
+            background: who === p.name ? COLORS.primary : "#fff",
+            color: who === p.name ? "#fff" : COLORS.inkSoft,
+            borderColor: who === p.name ? COLORS.primary : COLORS.line,
+          }}>{p.name}</button>
+        ))}
+      </div>
+
+      {/* جدول القطفات */}
+      <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, overflow: "auto" }}>
+        <table>
+          <thead>
+            <tr>
+              <th>القطفة</th>
+              <th>إجمالي العلب</th>
+              {shown.map((p) => <th key={p.id}>{p.name} ({fmt(p.pct, 1)}%)</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {batches.map((b) => (
+              <tr key={b.id}>
+                <td style={{ fontWeight: 600 }}>{b.date || "—"}</td>
+                <td>{fmt(b.box_count)}</td>
+                {shown.map((p) => (
+                  <td key={p.id} style={{ fontWeight: 700, color: COLORS.deep }}>
+                    {fmt(shareOf(b, p), 1)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr style={{ background: COLORS.bg }}>
+              <td style={{ fontWeight: 700 }}>إجمالي الإنتاج</td>
+              <td style={{ fontWeight: 700 }}>{fmt(totalBoxes)}</td>
+              {shown.map((p) => (
+                <td key={p.id} style={{ fontWeight: 700, color: COLORS.inkSoft }}>
+                  {fmt(totalBoxes * (num(p.pct) / 100), 1)}
+                </td>
+              ))}
+            </tr>
+            {gifts > 0 && (
+              <tr style={{ background: "#FBEAE8" }}>
+                <td style={{ fontWeight: 700, color: COLORS.alert }}>🎁 ناقص العطايا</td>
+                <td style={{ fontWeight: 700, color: COLORS.alert }}>− {fmt(gifts)}</td>
+                {shown.map((p) => (
+                  <td key={p.id} style={{ fontWeight: 700, color: COLORS.alert }}>
+                    − {fmt(gifts * (num(p.pct) / 100), 1)}
+                  </td>
+                ))}
+              </tr>
+            )}
+            <tr style={{ background: "rgba(107,122,58,.12)" }}>
+              <td style={{ fontWeight: 800 }}>الصافي لكل شريك</td>
+              <td style={{ fontWeight: 800 }}>{fmt(netTotal)}</td>
+              {shown.map((p) => (
+                <td key={p.id} style={{ fontWeight: 800, color: COLORS.secondary }}>
+                  {fmt(netTotal * (num(p.pct) / 100), 1)}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* خيار الشريك: علب أو بيع */}
+      <div style={{ display: "grid", gap: 9, marginTop: 14 }}>
+        {shown.map((p) => {
+          const total = netTotal * (num(p.pct) / 100);
+          const taken = takenOf(p);
+          const left = total - taken;
+          return (
+            <div key={p.id} style={{
+              background: COLORS.surface, border: `1px solid ${COLORS.line}`,
+              borderInlineStart: `4px solid ${COLORS.primary}`,
+              borderRadius: 12, padding: "12px 14px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ fontWeight: 800, fontSize: 14, color: COLORS.deep }}>{p.name}</div>
+                <button onClick={() => copyPlan(p)} style={{ ...ghostBtnStyle, padding: "6px 12px", fontSize: 11.5 }}>
+                  📋 نسخ كشفه
+                </button>
+              </div>
+              <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginTop: 7, lineHeight: 2 }}>
+                نصيبه <b style={{ color: COLORS.deep }}>{fmt(total, 1)} علبة</b>
+                {taken > 0 && <> · استلم <b style={{ color: COLORS.primary }}>{fmt(taken)}</b></>}
+                <br />
+                <span style={{ color: COLORS.secondary }}>
+                  🏠 لو أخذها علب: <b>{fmt(left, 1)} علبة</b> متاحة له
+                </span>
+                <br />
+                <span style={{ color: COLORS.primary }}>
+                  💰 لو باعها: <b>{fmt(left * boxPrice)} درهم</b> ({fmt(left, 1)} × {fmt(boxPrice)})
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{
+        background: COLORS.amberLight, borderRadius: 10, padding: "11px 14px",
+        fontSize: 11.5, color: COLORS.deep, marginTop: 12, lineHeight: 2,
+      }}>
+        <b>كيف تسجّلها:</b> إذا أخذ الشريك نصيبه علباً — سجّل سحباً من نوع «علب دبس» بالكمية.
+        وإذا اختار البيع — اترك العلب بالمخزن تُباع عادي، ثم سجّل له سحباً «نقدي» بقيمتها عند التسليم.
+      </div>
+    </div>
+  );
+}
+function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, boxPrice, onReload, showToast }) {
   const [wForm, setWForm] = useState({ date: todayISO(), partner_name: "", type: "نقدي", qty: "", amount: "", notes: "" });
   const [showForm, setShowForm] = useState(false);
 
@@ -2506,9 +2711,48 @@ function Partners({ partners, distribution, withdrawals, boughtNet, onReload, sh
   return (
     <div>
       <SectionTitle title="توزيع أرباح إنتاج المزرعة" />
+
+      {/* معادلة التوزيع */}
+      <div style={{
+        background: `linear-gradient(135deg, ${COLORS.deep}, #3A1C0C)`, color: "#F3E9D8",
+        borderRadius: 14, padding: "16px 18px", marginBottom: 16,
+      }}>
+        <div style={{ fontSize: 12, color: "#D8C4A8", marginBottom: 10 }}>الكمية القابلة للتوزيع على الشركاء</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13 }}>
+          <div>
+            <div style={{ color: "#C9B393", fontSize: 11 }}>إنتاج المزرعة</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 20 }}>{fmt(distribution.farmBoxes)}</div>
+          </div>
+          <span style={{ fontSize: 18, color: "#C9B393" }}>−</span>
+          <div>
+            <div style={{ color: "#C9B393", fontSize: 11 }}>عطايا المزرعة 🎁</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 20, color: "#E8A79C" }}>{fmt(distribution.farmGifts)}</div>
+          </div>
+          <span style={{ fontSize: 18, color: "#C9B393" }}>=</span>
+          <div>
+            <div style={{ color: "#C9B393", fontSize: 11 }}>الصافي للتوزيع</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 24, color: "#B9D189" }}>{fmt(distribution.netBoxes)} علبة</div>
+          </div>
+        </div>
+        {distribution.farmGifts > 0 && (
+          <div style={{ fontSize: 11.5, color: "#C9B393", marginTop: 10, lineHeight: 1.8 }}>
+            العطايا تُخصم من الجميع بالتناسب قبل التقسيم.
+          </div>
+        )}
+        {distribution.farmBoxes === 0 && (
+          <div style={{
+            background: "rgba(232,167,156,.18)", borderRadius: 9, padding: "9px 12px",
+            fontSize: 11.5, color: "#E8A79C", marginTop: 12, lineHeight: 1.9,
+          }}>
+            ⚠️ لا يوجد إنتاج علب مسجّل من «إنتاج المزرعة».
+            افتح تبويب «إنتاج العلب» وتأكد أن المصدر مضبوط على «إنتاج المزرعة» وأن عدد العلب مُدخل.
+          </div>
+        )}
+      </div>
+
       <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
         {partners.map((p, i) => {
-          const row = distribution.rows[i] || { share: 0, withdrawn: 0, remaining: 0 };
+          const row = distribution.rows[i] || { share: 0, withdrawn: 0, remaining: 0, boxShare: 0, boxTaken: 0, boxLeft: 0, giftCut: 0 };
           return (
             <div key={p.id} style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, padding: 14 }}>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -2525,11 +2769,39 @@ function Partners({ partners, distribution, withdrawals, boughtNet, onReload, sh
                 <div><div style={{ color: COLORS.inkSoft }}>المسحوب</div><div style={{ fontWeight: 700, color: COLORS.primary }}>{fmt(row.withdrawn)}</div></div>
                 <div><div style={{ color: COLORS.inkSoft }}>المتبقي</div><div style={{ fontWeight: 800, color: row.remaining >= 0 ? COLORS.secondary : COLORS.alert }}>{fmt(row.remaining)}</div></div>
               </div>
+
+              {/* نصيب الشريك من العلب المنتجة */}
+              <div style={{
+                display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8,
+                marginTop: 10, paddingTop: 10, fontSize: 12.5,
+                borderTop: `1px dashed ${COLORS.line}`,
+              }}>
+                <div>
+                  <div style={{ color: COLORS.inkSoft }}>نصيبه من العلب 📦</div>
+                  <div style={{ fontWeight: 700, color: COLORS.deep }}>{fmt(row.boxShare, 1)} علبة</div>
+                </div>
+                <div>
+                  <div style={{ color: COLORS.inkSoft }}>استلم علب</div>
+                  <div style={{ fontWeight: 700, color: COLORS.primary }}>{fmt(row.boxTaken)}</div>
+                </div>
+                <div>
+                  <div style={{ color: COLORS.inkSoft }}>باقي له</div>
+                  <div style={{ fontWeight: 800, color: row.boxLeft >= 0 ? COLORS.secondary : COLORS.alert }}>{fmt(row.boxLeft, 1)}</div>
+                </div>
+              </div>
+              {row.giftCut > 0 && (
+                <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.8 }}>
+                  🎁 تحمّل من العطايا: <b style={{ color: COLORS.alert }}>{fmt(row.giftCut, 1)} علبة</b> (مخصومة من نصيبه أعلاه)
+                </div>
+              )}
             </div>
           );
         })}
         <button onClick={addPartner} style={primaryBtnStyle}>+ إضافة شريك</button>
       </div>
+
+      <PartnerBatches partners={partners} boxesRows={boxesRows} withdrawals={withdrawals}
+        farmGifts={distribution.farmGifts} boxPrice={boxPrice || DEFAULT_BOX_PRICE} showToast={showToast} />
 
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
         <SectionTitle title="سحوبات الشركاء" />
