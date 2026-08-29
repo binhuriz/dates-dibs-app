@@ -82,7 +82,7 @@ const dangerBtnStyle = { padding: "6px 10px", borderRadius: 8, border: "none", b
 
 const BRAND_NAME = "دبس";
 const BRAND_TAGLINE = "طبيعة · أصالة · جودة";
-const DEFAULT_BOX_PRICE = 150;
+let DEFAULT_BOX_PRICE = 150;   // يُحمّل من الإعدادات عند بدء التطبيق
 const BOX_SIZE_KG = 4;
 const SOURCE_OPTIONS = ["إنتاج المزرعة", "تمور مشتراة"];
 const PURCHASE_METHOD_OPTIONS = ["بالصندوق", "بالنخلة"];
@@ -231,8 +231,8 @@ const TABLES = {
     display: ["date", "category", "description", "source", "amount", "cost_type", "notes"],
   },
 };
-const TAB_ORDER = ["dashboard", "bags", "boxes", "purchases", "orders", "sales", "nafia", "gifts", "costs", "sources", "partners"];
-const TAB_META = { dashboard: { label: "لوحة التحكم", icon: "📊" }, sources: { label: "ملخص المصادر", icon: "🗂️" }, partners: { label: "الشركاء", icon: "🤝" } };
+const TAB_ORDER = ["dashboard", "bags", "boxes", "purchases", "orders", "sales", "collect", "nafia", "gifts", "costs", "sources", "partners"];
+const TAB_META = { dashboard: { label: "لوحة التحكم", icon: "📊" }, sources: { label: "ملخص المصادر", icon: "🗂️" }, partners: { label: "الشركاء", icon: "🤝" }, collect: { label: "التحصيل", icon: "💰" } };
 
 /* ============ طبقة الاتصال بقاعدة البيانات ============ */
 async function fetchTable(table) {
@@ -289,11 +289,21 @@ function computeDash(rows) {
   const totalRevenue = salesRevenue + nafiaRevenue;
   const totalCosts = costs.reduce((s, r) => s + num(r.amount), 0);
   const totalBags = bagsFarm + bagsBought, totalBoxes = boxesFarm + boxesBought;
+
+  /* ===== حركة العلب ===== */
+  const orders = rows.orders || [];
+  const ordered = orders.reduce((s, r) => s + num(r.qty_requested), 0);   // إجمالي المطلوب
+  const delivered = sales.reduce((s, r) => s + num(r.qty), 0);            // المسلّم فعلاً
+  const gifted = gifts.reduce((s, r) => s + num(r.qty), 0);               // العطايا
+  const pending = orders.reduce((s, r) => s + Math.max(0, num(r.qty_requested) - num(r.delivered)), 0); // المتبقي للعملاء
+  const available = totalBoxes - delivered - gifted;                      // المتوفر بالمخزن
+
   return {
     bagsFarm, bagsBought, boxesFarm, boxesBought, totalDibs, nafiaSacks, salesRevenue, nafiaRevenue,
     totalRevenue, totalCosts, netProfit: totalRevenue - totalCosts,
     avgBoxesPerBag: totalBags > 0 ? totalBoxes / totalBags : 0,
-    totalGiftBoxes: gifts.reduce((s, r) => s + num(r.qty), 0),
+    totalGiftBoxes: gifted,
+    totalBoxes, ordered, delivered, pending, available,
   };
 }
 
@@ -1149,9 +1159,409 @@ function StoryPage() {
   );
 }
 
+/* ============ التحصيل والذمم ============ */
+
+function CollectionsPanel({ sales, onReload, showToast }) {
+  const [busy, setBusy] = useState(null);
+  const [method, setMethod] = useState({});
+
+  const uncollected = useMemo(
+    () => (sales || []).filter((s) => !s.collected && num(s.qty) > 0),
+    [sales]
+  );
+  const collected = useMemo(
+    () => (sales || []).filter((s) => s.collected),
+    [sales]
+  );
+
+  const totalOf = (list) => list.reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
+  const due = totalOf(uncollected);
+  const got = totalOf(collected);
+  const cash = totalOf(collected.filter((s) => s.payment_method === "كاش"));
+  const bank = totalOf(collected.filter((s) => s.payment_method === "تحويل بنكي"));
+
+  const collect = async (s) => {
+    const m = method[s.id] || "كاش";
+    const total = num(s.qty) * num(s.unit_price);
+    if (!window.confirm(`تأكيد تحصيل ${fmt(total)} درهم من ${s.customer || "العميل"} (${m})؟`)) return;
+    setBusy(s.id);
+    try {
+      await updateRow("sales", s.id, { collected: true, collected_at: todayISO(), payment_method: m });
+      await onReload();
+      showToast("تم تسجيل التحصيل ✅");
+    } catch (err) {
+      console.error(err);
+      showToast("تعذّر تسجيل التحصيل");
+    }
+    setBusy(null);
+  };
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <SectionTitle title="التحصيل" subtitle={uncollected.length ? `${uncollected.length} عملية غير محصّلة` : "لا توجد ذمم"} />
+
+      {/* إحصائية */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+        <StatCard label="محصّل" value={fmt(got)} icon="✅" accent={COLORS.secondary} />
+        <StatCard label="ذمم (غير محصّل)" value={fmt(due)} icon="⏳" accent={due > 0 ? COLORS.alert : COLORS.inkSoft} />
+        <StatCard label="كاش" value={fmt(cash)} icon="💵" />
+        <StatCard label="تحويل بنكي" value={fmt(bank)} icon="🏦" />
+      </div>
+
+      {uncollected.length > 0 && (
+        <div style={{ display: "grid", gap: 9 }}>
+          {uncollected.map((s) => {
+            const total = num(s.qty) * num(s.unit_price);
+            return (
+              <div key={s.id} style={{
+                background: COLORS.surface, borderRadius: 12, padding: "11px 13px",
+                border: `1px solid ${COLORS.line}`, borderInlineStart: `4px solid ${COLORS.alert}`,
+                display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 9,
+              }}>
+                <div style={{ flex: "1 1 160px" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{s.customer || "—"}</div>
+                  <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>
+                    {fmt(s.qty)} علبة × {fmt(s.unit_price)} · <b style={{ color: COLORS.alert }}>{fmt(total)} درهم</b>
+                    {s.date ? ` · ${s.date}` : ""}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <select value={method[s.id] || "كاش"}
+                    onChange={(e) => setMethod((p) => ({ ...p, [s.id]: e.target.value }))}
+                    style={{ ...inputStyle, width: 112 }}>
+                    {COLLECT_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <button disabled={busy === s.id} onClick={() => collect(s)}
+                    style={{ ...primaryBtnStyle, background: COLORS.secondary, opacity: busy === s.id ? 0.6 : 1 }}>
+                    {busy === s.id ? "…" : "💰 تحصيل"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============ تسليم الطلبات ============ */
+
+function DeliveryPanel({ orders, onReload, showToast, boxPrice }) {
+  const [busy, setBusy] = useState(null);
+  const [partial, setPartial] = useState({});  // { orderId: qty }
+  const [price, setPrice] = useState({});      // { orderId: unit_price }
+  const [pay, setPay] = useState({});          // { orderId: "كاش" | "تحويل بنكي" }
+
+  const openOrders = useMemo(
+    () => (orders || []).filter((o) => num(o.remaining) > 0),
+    [orders]
+  );
+
+  const deliver = async (o, qty, collected) => {
+    const q = num(qty);
+    const up = num(price[o.id] ?? boxPrice);
+    const method = pay[o.id] || "كاش";
+    if (q <= 0) { showToast("أدخل كمية صحيحة"); return; }
+    if (q > num(o.remaining)) { showToast("الكمية أكبر من المتبقي"); return; }
+    if (up <= 0) { showToast("أدخل سعراً صحيحاً"); return; }
+    const total = q * up;
+    const msg = collected
+      ? `تسليم ${fmt(q)} علبة إلى ${o.customer_name}\nالإجمالي ${fmt(total)} درهم — محصّل (${method})؟`
+      : `تسليم ${fmt(q)} علبة إلى ${o.customer_name}\nالإجمالي ${fmt(total)} درهم — غير محصّل بعد؟`;
+    if (!window.confirm(msg)) return;
+
+    setBusy(o.id);
+    try {
+      await insertRow("sales", {
+        date: todayISO(),
+        order_id: o.id,
+        customer: o.customer_name,
+        qty: q,
+        unit_price: up,
+        payment_method: collected ? method : null,
+        collected: !!collected,
+        collected_at: collected ? todayISO() : null,
+        notes: "تسليم من قائمة الطلبات",
+      });
+      setPartial((p) => ({ ...p, [o.id]: "" }));
+      await onReload();
+      showToast(q === num(o.remaining) ? "تم تسليم الطلب كاملاً ✅" : `تم تسليم ${fmt(q)} علبة (جزئي)`);
+    } catch (err) {
+      console.error(err);
+      showToast("تعذّر تسجيل التسليم");
+    }
+    setBusy(null);
+  };
+
+  if (!openOrders.length) {
+    return (
+      <div style={{
+        background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 14,
+        padding: "22px 16px", marginBottom: 18, textAlign: "center",
+        color: COLORS.inkSoft, fontSize: 13.5,
+      }}>
+        ✅ لا توجد طلبات بانتظار التسليم.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: 14, marginBottom: 18 }}>
+      <SectionTitle title="التسليم" subtitle={`${openOrders.length} طلب بانتظار التسليم`} />
+
+      <div style={{ display: "grid", gap: 9 }}>
+        {openOrders.map((o) => {
+          const rem = num(o.remaining);
+          const done = num(o.delivered);
+          const req = num(o.qty_requested);
+          const pct = req > 0 ? Math.round((done / req) * 100) : 0;
+          return (
+            <div key={o.id} style={{
+              background: COLORS.bg, borderRadius: 12, padding: "11px 13px",
+              border: `1px solid ${COLORS.line}`, borderInlineStart: `4px solid ${done > 0 ? COLORS.primary : COLORS.line}`,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ flex: "1 1 150px" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{o.customer_name}</div>
+                  <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>
+                    طلب {fmt(req)} · سُلّم {fmt(done)} · <b style={{ color: COLORS.alert }}>متبقٍ {fmt(rem)}</b>
+                    {o.order_date ? ` · ${o.order_date}` : ""}
+                  </div>
+                  {/* شريط التقدم */}
+                  <div style={{ height: 5, background: COLORS.line, borderRadius: 3, marginTop: 7, overflow: "hidden" }}>
+                    <div style={{ width: `${pct}%`, height: "100%", background: COLORS.secondary, borderRadius: 3 }} />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gap: 7, flex: "0 0 auto" }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <input type="number" min="1" max={rem}
+                      value={partial[o.id] ?? ""}
+                      onChange={(e) => setPartial((p) => ({ ...p, [o.id]: e.target.value }))}
+                      placeholder={`${rem}`}
+                      title="الكمية"
+                      style={{ ...inputStyle, width: 66, textAlign: "center" }} />
+                    <span style={{ fontSize: 11, color: COLORS.inkSoft }}>×</span>
+                    <input type="number" min="0"
+                      value={price[o.id] ?? boxPrice}
+                      onChange={(e) => setPrice((p) => ({ ...p, [o.id]: e.target.value }))}
+                      title="سعر العلبة"
+                      style={{ ...inputStyle, width: 76, textAlign: "center" }} />
+                    <select value={pay[o.id] || "كاش"}
+                      onChange={(e) => setPay((p) => ({ ...p, [o.id]: e.target.value }))}
+                      style={{ ...inputStyle, width: 108 }}>
+                      {COLLECT_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: COLORS.deep, fontWeight: 700, textAlign: "center" }}>
+                    الإجمالي: {fmt(num(partial[o.id] || rem) * num(price[o.id] ?? boxPrice))} درهم
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      disabled={busy === o.id}
+                      onClick={() => deliver(o, partial[o.id] || rem, true)}
+                      style={{ ...primaryBtnStyle, background: COLORS.secondary, flex: 1, opacity: busy === o.id ? 0.6 : 1 }}>
+                      {busy === o.id ? "…" : "✓ سلّم وحصّل"}
+                    </button>
+                    <button
+                      disabled={busy === o.id}
+                      onClick={() => deliver(o, partial[o.id] || rem, false)}
+                      style={{ ...ghostBtnStyle, opacity: busy === o.id ? 0.6 : 1 }}
+                      title="سُلّم لكن لم يُدفع بعد">
+                      آجل
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.9 }}>
+        اترك خانة الكمية فارغة لتسليم المتبقي كاملاً. السعر قابل للتعديل لكل عملية.
+        «سلّم وحصّل» يسجّل التسليم والتحصيل معاً · «آجل» يسجّل التسليم فقط ويبقى المبلغ في الذمم.
+      </div>
+    </div>
+  );
+}
+
+/* ============ توزيع الكمية المتوفرة على الطلبات ============ */
+
+function AllocationPanel({ orders, available, showToast }) {
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState({});   // { orderId: qty }
+  const [strategy, setStrategy] = useState("fifo");
+
+  /* الطلبات التي لم تكتمل بعد */
+  const pendingOrders = useMemo(
+    () => (orders || []).filter((o) => num(o.remaining) > 0),
+    [orders]
+  );
+  const totalPending = pendingOrders.reduce((s, o) => s + num(o.remaining), 0);
+  const allocated = Object.values(picked).reduce((s, v) => s + num(v), 0);
+  const left = available - allocated;
+
+  /* التوزيع التلقائي */
+  const autoAllocate = (mode) => {
+    setStrategy(mode);
+    let pool = available;
+    const next = {};
+
+    if (mode === "fifo") {
+      // الأقدم أولاً — يُخدم كاملاً ثم التالي
+      [...pendingOrders]
+        .sort((a, b) => String(a.order_date || "").localeCompare(String(b.order_date || "")))
+        .forEach((o) => {
+          const take = Math.min(num(o.remaining), pool);
+          if (take > 0) { next[o.id] = take; pool -= take; }
+        });
+    } else if (mode === "small") {
+      // الطلبات الصغيرة أولاً — يُرضي أكبر عدد من العملاء
+      [...pendingOrders]
+        .sort((a, b) => num(a.remaining) - num(b.remaining))
+        .forEach((o) => {
+          const take = Math.min(num(o.remaining), pool);
+          if (take > 0) { next[o.id] = take; pool -= take; }
+        });
+    } else {
+      // بالتناسب — كل عميل يأخذ نسبة من طلبه
+      const ratio = totalPending > 0 ? available / totalPending : 0;
+      pendingOrders.forEach((o) => {
+        const take = Math.floor(num(o.remaining) * ratio);
+        if (take > 0) next[o.id] = take;
+      });
+    }
+    setPicked(next);
+  };
+
+  const setQty = (id, v, max) => {
+    const q = Math.max(0, Math.min(num(v), max));
+    setPicked((p) => ({ ...p, [id]: q }));
+  };
+
+  if (!pendingOrders.length) return null;
+
+  const shortage = available < totalPending;
+
+  return (
+    <div style={{
+      background: COLORS.surface, borderRadius: 14,
+      border: `1px solid ${shortage ? COLORS.alert : COLORS.line}`,
+      padding: 14, marginBottom: 18,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 15, color: COLORS.deep }}>
+            توزيع الكمية المتوفرة
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 3, lineHeight: 1.8 }}>
+            المتوفر <b style={{ color: shortage ? COLORS.alert : COLORS.secondary }}>{fmt(available)}</b> علبة ·
+            المطلوب <b>{fmt(totalPending)}</b> علبة
+            {shortage && <span style={{ color: COLORS.alert }}> · نقص {fmt(totalPending - available)}</span>}
+          </div>
+        </div>
+        <button onClick={() => setOpen((v) => !v)} style={ghostBtnStyle}>
+          {open ? "إخفاء" : "🎯 وزّع الكمية"}
+        </button>
+      </div>
+
+      {open && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
+            {[
+              { k: "fifo", l: "الأقدم أولاً" },
+              { k: "small", l: "الأصغر أولاً" },
+              { k: "pro", l: "بالتناسب" },
+            ].map((s) => (
+              <button key={s.k} onClick={() => autoAllocate(s.k)} style={{
+                ...ghostBtnStyle, padding: "7px 13px", fontSize: 12,
+                background: strategy === s.k && allocated > 0 ? COLORS.primary : "#fff",
+                color: strategy === s.k && allocated > 0 ? "#fff" : COLORS.inkSoft,
+                borderColor: strategy === s.k && allocated > 0 ? COLORS.primary : COLORS.line,
+              }}>{s.l}</button>
+            ))}
+            {allocated > 0 && (
+              <button onClick={() => setPicked({})} style={{ ...ghostBtnStyle, padding: "7px 13px", fontSize: 12, color: COLORS.alert, borderColor: COLORS.alert }}>
+                ✕ مسح
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            {pendingOrders.map((o) => {
+              const max = num(o.remaining);
+              const q = num(picked[o.id]);
+              const partial = q > 0 && q < max;
+              return (
+                <div key={o.id} style={{
+                  display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                  background: q > 0 ? "rgba(107,122,58,.08)" : COLORS.bg,
+                  borderRadius: 10, padding: "9px 12px",
+                  border: `1px solid ${q > 0 ? COLORS.secondary : COLORS.line}`,
+                }}>
+                  <div style={{ flex: "1 1 140px", fontSize: 13 }}>
+                    <b>{o.customer_name}</b>
+                    <span style={{ color: COLORS.inkSoft, fontSize: 11.5 }}> · طلب {fmt(o.qty_requested)} · متبقٍ {fmt(max)}</span>
+                    {o.order_date && <span style={{ color: COLORS.inkSoft, fontSize: 11 }}> · {o.order_date}</span>}
+                  </div>
+                  <input type="number" min="0" max={max} value={picked[o.id] ?? ""}
+                    onChange={(e) => setQty(o.id, e.target.value, max)}
+                    placeholder="0"
+                    style={{ ...inputStyle, width: 80, textAlign: "center" }} />
+                  <button onClick={() => setQty(o.id, max, max)} style={{ ...ghostBtnStyle, padding: "6px 10px", fontSize: 11.5 }}>
+                    كامل
+                  </button>
+                  {partial && (
+                    <span style={{ fontSize: 11, color: COLORS.primary, fontWeight: 700 }}>جزئي</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            marginTop: 14, paddingTop: 12, borderTop: `1px solid ${COLORS.line}`,
+            flexWrap: "wrap", gap: 10, fontSize: 13,
+          }}>
+            <div>
+              الموزّع: <b style={{ color: COLORS.primary }}>{fmt(allocated)}</b> علبة ·
+              المتبقي من المخزون: <b style={{ color: left < 0 ? COLORS.alert : COLORS.secondary }}>{fmt(left)}</b>
+            </div>
+            <button
+              onClick={() => {
+                const lines = pendingOrders
+                  .filter((o) => num(picked[o.id]) > 0)
+                  .map((o) => `• ${o.customer_name}: ${fmt(picked[o.id])} علبة${num(picked[o.id]) < num(o.remaining) ? " (جزئي)" : ""}`);
+                if (!lines.length) { showToast("لم تُوزّع أي كمية بعد"); return; }
+                navigator.clipboard?.writeText(["خطة التسليم:", ...lines, "", `الإجمالي: ${fmt(allocated)} علبة`].join("\\n"));
+                showToast("تم نسخ خطة التسليم");
+              }}
+              style={primaryBtnStyle}>
+              📋 نسخ خطة التسليم
+            </button>
+          </div>
+
+          {left < 0 && (
+            <div style={{ color: COLORS.alert, fontSize: 12, marginTop: 10, fontWeight: 700 }}>
+              ⚠️ وزّعت أكثر من المتوفر بـ {fmt(Math.abs(left))} علبة.
+            </div>
+          )}
+
+          <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.9 }}>
+            هذه أداة تخطيط فقط — لا تُسجّل مبيعات. بعد الاتفاق مع العميل، سجّل التسليم في تبويب «المبيعات».
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ============ شريط الأدوات: الفلترة والتصدير ============ */
 
-function ToolsBar({ range, setRange, onExportBackup, onExportCSV }) {
+function ToolsBar({ range, setRange, onExportBackup, onExportCSV, boxPrice, onChangePrice }) {
   const preset = (days) => {
     const to = new Date();
     const from = new Date();
@@ -1196,6 +1606,9 @@ function ToolsBar({ range, setRange, onExportBackup, onExportCSV }) {
         <button onClick={onExportCSV} style={{ ...ghostBtnStyle, padding: "7px 12px", fontSize: 12 }}>
           📊 تصدير تقرير
         </button>
+        <button onClick={onChangePrice} style={{ ...ghostBtnStyle, padding: "7px 12px", fontSize: 12 }}>
+          🏷️ سعر العلبة: {fmt(boxPrice)}
+        </button>
         <button onClick={onExportBackup} style={{ ...primaryBtnStyle, padding: "7px 12px", fontSize: 12 }}>
           💾 نسخة احتياطية
         </button>
@@ -1217,6 +1630,7 @@ function MainApp({ session }) {
   const [incoming, setIncoming] = useState([]);
   const [cancelled, setCancelled] = useState([]);
   const [ordersOpen, setOrdersOpen] = useState(true);
+  const [boxPrice, setBoxPrice] = useState(DEFAULT_BOX_PRICE);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState(null);
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); }, []);
@@ -1240,6 +1654,8 @@ function MainApp({ session }) {
     setCancelled(canc || []);
     const openVal = await getSetting("orders_open", true);
     setOrdersOpen(openVal !== false && openVal !== "false");
+    const priceVal = num(await getSetting("box_price", DEFAULT_BOX_PRICE));
+    if (priceVal > 0) { DEFAULT_BOX_PRICE = priceVal; setBoxPrice(priceVal); }
     setLoaded(true);
   }, []);
 
@@ -1287,6 +1703,17 @@ function MainApp({ session }) {
     a.click();
     URL.revokeObjectURL(a.href);
     showToast("تم تنزيل التقرير");
+  };
+
+  const changeBoxPrice = async () => {
+    const v = window.prompt("سعر العلبة الجديد (درهم):", String(boxPrice));
+    if (v === null) return;
+    const p = num(v);
+    if (p <= 0) { showToast("أدخل سعراً صحيحاً"); return; }
+    await setSetting("box_price", p);
+    DEFAULT_BOX_PRICE = p;
+    setBoxPrice(p);
+    showToast(`تم تحديث سعر العلبة إلى ${fmt(p)} درهم`);
   };
 
   const toggleOrders = async () => {
@@ -1421,11 +1848,20 @@ function MainApp({ session }) {
 
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "18px 16px 60px" }}>
         {(tab === "dashboard" || tab === "sources") && (
-          <ToolsBar range={range} setRange={setRange} onExportBackup={exportBackup} onExportCSV={exportCSV} />
+          <ToolsBar range={range} setRange={setRange} onExportBackup={exportBackup} onExportCSV={exportCSV} boxPrice={boxPrice} onChangePrice={changeBoxPrice} />
         )}
         {tab === "dashboard" && <Dashboard dash={dash} />}
         {tab === "sources" && <SourceSummary summary={sourceSummary} />}
+        {tab === "collect" && (
+          <CollectionsPanel sales={filteredRows.sales || []} onReload={loadAll} showToast={showToast} />
+        )}
         {tab === "partners" && <Partners partners={data.partners} distribution={partnersDistribution} withdrawals={data.withdrawals} boughtNet={sourceSummary.bought.net} onReload={loadAll} showToast={showToast} />}
+        {tab === "orders" && (
+          <DeliveryPanel orders={filteredRows.orders || []} onReload={loadAll} showToast={showToast} boxPrice={boxPrice} />
+        )}
+        {tab === "orders" && (
+          <AllocationPanel orders={filteredRows.orders || []} available={dash.available} showToast={showToast} />
+        )}
         {tab === "orders" && (
           <IncomingOrders incoming={incoming} cancelled={cancelled} onAccept={acceptIncoming} onCancel={cancelIncoming} ordersOpen={ordersOpen} onToggleOrders={toggleOrders} onReload={loadAll} />
         )}
@@ -1466,6 +1902,27 @@ function Dashboard({ dash }) {
         <div style={{ fontSize: 12.5, color: "#D8C4A8" }}>صافي الربح / العائد</div>
         <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 32, color: dash.netProfit >= 0 ? "#B9D189" : "#E8A79C" }}>{fmt(dash.netProfit)}</div>
       </div>
+      <SectionTitle title="حركة العلب" subtitle="المطلوب · المسلّم · المتوفر" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 26 }}>
+        <StatCard label="علب مطلوبة" value={fmt(dash.ordered)} icon="📋" accent={COLORS.primary} />
+        <StatCard label="علب مسلّمة" value={fmt(dash.delivered)} icon="✅" accent={COLORS.secondary} />
+        <StatCard label="بانتظار التسليم" value={fmt(dash.pending)} icon="⏳" accent={dash.pending > 0 ? COLORS.alert : COLORS.inkSoft} />
+        <StatCard
+          label="المتوفر بالمخزن"
+          value={fmt(dash.available)}
+          icon="📦"
+          accent={dash.available < dash.pending ? COLORS.alert : COLORS.secondary}
+        />
+      </div>
+      {dash.available < dash.pending && (
+        <div style={{
+          background: "#FBEAE8", border: `1px solid ${COLORS.alert}`, color: COLORS.alert,
+          borderRadius: 12, padding: "11px 14px", fontSize: 12.5, marginBottom: 26, lineHeight: 1.9, fontWeight: 600,
+        }}>
+          ⚠️ المتوفر ({fmt(dash.available)} علبة) أقل من المطلوب تسليمه ({fmt(dash.pending)} علبة).
+        </div>
+      )}
+
       <SectionTitle title="الإنتاج" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 26 }}>
         <StatCard label="أكياس المزرعة" value={fmt(dash.bagsFarm)} icon="🌴" accent={COLORS.secondary} />
