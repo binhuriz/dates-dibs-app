@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>المدبسة — دبس تمر طبيعي</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 14C50 14 76 45 76 62A26 26 0 0 1 24 62C24 45 50 14 50 14Z' fill='%23B5651D'/%3E%3Cg stroke='%23F3E3C8' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M50 78L50 42'/%3E%3Cpath d='M50 48C43 42 37 42 32 46'/%3E%3Cpath d='M50 48C57 42 63 42 68 46'/%3E%3Cpath d='M50 58C42 52 35 53 30 58'/%3E%3Cpath d='M50 58C58 52 65 53 70 58'/%3E%3Cpath d='M50 68C43 63 37 64 33 69'/%3E%3Cpath d='M50 68C57 63 63 64 67 69'/%3E%3C/g%3E%3C/svg%3E" />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" />
+<title>دبس — دبس تمر طبيعي</title>
+<link rel="icon" href="icon.jpeg" />
+<link rel="apple-touch-icon" href="icon.jpeg" />
+<meta name="theme-color" content="#4A2511" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" />
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
@@ -65,6 +67,9 @@ const SUPABASE_ANON_KEY = "sb_publishable_sU50jbymdbgops4qND1JqA_MbKFvymv";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ============ الألوان والتصميم ============ */
+const GOLD = "#C89B3C";
+const GOLD_LIGHT = "#E8C77A";
+const CREAM = "#FAF3E6";
 const COLORS = {
   bg: "#FBF6EC", surface: "#FFFFFF", ink: "#2B1B12", inkSoft: "#6B5342",
   primary: "#B5651D", primaryDark: "#8F4E15", secondary: "#6B7A3A",
@@ -75,8 +80,8 @@ const primaryBtnStyle = { padding: "9px 16px", borderRadius: 9, border: "none", 
 const ghostBtnStyle = { padding: "9px 16px", borderRadius: 9, border: `1px solid ${COLORS.line}`, background: "#fff", color: COLORS.inkSoft, fontWeight: 600, fontSize: 13, cursor: "pointer" };
 const dangerBtnStyle = { padding: "6px 10px", borderRadius: 8, border: "none", background: "transparent", color: COLORS.alert, fontWeight: 600, fontSize: 12.5, cursor: "pointer" };
 
-const BRAND_NAME = "المدبسة";
-const BRAND_TAGLINE = "دبس تمر طبيعي";
+const BRAND_NAME = "دبس";
+const BRAND_TAGLINE = "طبيعة · أصالة · جودة";
 const DEFAULT_BOX_PRICE = 150;
 const BOX_SIZE_KG = 4;
 const SOURCE_OPTIONS = ["إنتاج المزرعة", "تمور مشتراة"];
@@ -295,54 +300,105 @@ function computeDash(rows) {
 /* ============ اللوجو ============ */
 
 function LogoMark({ size = 56, light = false }) {
-  const id = "g" + size + (light ? "l" : "d");
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1="50" y1="14" x2="50" y2="90" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#C87A2A" />
-          <stop offset="0.5" stopColor="#B5651D" />
-          <stop offset="1" stopColor="#4A2511" />
-        </linearGradient>
-      </defs>
-
-      {/* حلقة خارجية */}
-      <circle cx="50" cy="50" r="47" stroke={light ? "rgba(243,233,216,.45)" : "#C99B5A"} strokeWidth="1.5" opacity="0.75" />
-
-      {/* قطرة الدبس */}
-      <path
-        d="M50 14 C50 14 76 45 76 62 A26 26 0 0 1 24 62 C24 45 50 14 50 14 Z"
-        fill={`url(#${id})`}
-      />
-
-      {/* سعفة النخيل داخل القطرة */}
-      <g stroke={light ? "#FBF6EC" : "#F3E3C8"} strokeWidth="2.4" strokeLinecap="round" opacity="0.95">
-        <path d="M50 78 L50 42" />
-        <path d="M50 47 C43 41 37 41 32 45" />
-        <path d="M50 47 C57 41 63 41 68 45" />
-        <path d="M50 56 C42 50 35 51 30 56" />
-        <path d="M50 56 C58 50 65 51 70 56" />
-        <path d="M50 65 C43 60 37 61 33 66" />
-        <path d="M50 65 C57 60 63 61 67 66" />
-      </g>
-    </svg>
+    <img src="icon.jpeg" alt={BRAND_NAME}
+      style={{
+        width: size, height: size, borderRadius: size * 0.24,
+        objectFit: "cover", display: "block",
+        border: light ? "1px solid rgba(243,233,216,.35)" : `1px solid ${COLORS.line}`,
+        boxShadow: light ? "0 6px 18px rgba(0,0,0,.35)" : "0 4px 12px rgba(74,37,17,.18)",
+      }} />
   );
 }
 
 function LogoLockup({ size = 52, light = false, center = false }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: center ? "center" : "flex-start" }}>
+    <div style={{
+      display: "flex", alignItems: "center", gap: size * 0.28,
+      justifyContent: center ? "center" : "flex-start",
+    }}>
       <LogoMark size={size} light={light} />
       <div>
         <div style={{
-          fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: size * 0.42,
-          color: light ? "#FBF6EC" : COLORS.deep, lineHeight: 1.2, letterSpacing: 0.5,
-        }}>{BRAND_NAME}</div>
+          fontFamily: "Cairo, sans-serif", fontWeight: 900,
+          fontSize: size * 0.5, lineHeight: 1.05,
+          color: light ? "#FBF6EC" : COLORS.deep, letterSpacing: -0.3,
+        }}>
+          dibs <span style={{ fontWeight: 800 }}>{BRAND_NAME}</span>
+        </div>
         <div style={{
-          fontSize: size * 0.22, color: light ? "#D8C4A8" : COLORS.inkSoft,
-          marginTop: 2, letterSpacing: 1,
-        }}>{BRAND_TAGLINE}</div>
+          fontSize: size * 0.2, color: light ? "#C9B393" : COLORS.inkSoft,
+          marginTop: size * 0.09, letterSpacing: 1.2,
+        }}>
+          {BRAND_TAGLINE}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/* ============ عناصر زخرفية ============ */
+
+/* ختم عضوي دائري */
+function OrganicSeal({ size = 62 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-label="عضوي">
+      <circle cx="50" cy="50" r="48" fill="#4C6B2F" />
+      <circle cx="50" cy="50" r="41" fill="none" stroke="#D6E6BF" strokeWidth="1.2" opacity="0.75" />
+      <text x="50" y="30" textAnchor="middle" fill="#EAF3DC"
+        style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 15 }}>عضوي</text>
+      <g transform="translate(50,52)">
+        <path d="M0 6 C-9 4 -13 -3 -11 -9 C-4 -10 1 -5 0 6 Z" fill="#CFE3B0" />
+        <path d="M0 6 C9 4 13 -3 11 -9 C4 -10 -1 -5 0 6 Z" fill="#EAF3DC" />
+      </g>
+      <text x="50" y="76" textAnchor="middle" fill="#CFE3B0"
+        style={{ fontFamily: "Cairo, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: 1 }}>ORGANIC</text>
+      <text x="50" y="87" textAnchor="middle" fill="#A9C489"
+        style={{ fontFamily: "Tajawal, sans-serif", fontSize: 7, letterSpacing: 1 }}>100% NATURAL</text>
+    </svg>
+  );
+}
+
+/* فاصل زخرفي */
+function Divider({ light = false }) {
+  const col = light ? "rgba(232,199,122,.5)" : "rgba(200,155,60,.55)";
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, margin: "16px 0" }}>
+      <div style={{ height: 1, flex: 1, background: `linear-gradient(to right, transparent, ${col})` }} />
+      {[0, 1, 2].map((i) => (
+        <span key={i} style={{
+          width: 5, height: 5, background: col, transform: "rotate(45deg)",
+          opacity: i === 1 ? 1 : 0.6,
+        }} />
+      ))}
+      <div style={{ height: 1, flex: 1, background: `linear-gradient(to left, transparent, ${col})` }} />
+    </div>
+  );
+}
+
+/* صف المزايا بأيقونات دائرية */
+const FEATURES = [
+  { icon: "🌴", t1: "طبيعي", t2: "100%" },
+  { icon: "🌿", t1: "بدون مواد", t2: "حافظة" },
+  { icon: "💧", t1: "غني بالعناصر", t2: "الغذائية" },
+];
+
+function FeatureRow({ light = false }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+      {FEATURES.map((f) => (
+        <div key={f.t1} style={{ textAlign: "center" }}>
+          <div style={{
+            width: 46, height: 46, margin: "0 auto 7px", borderRadius: 23,
+            border: `1.5px solid ${light ? "rgba(232,199,122,.55)" : GOLD}`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+            background: light ? "rgba(255,255,255,.06)" : "rgba(200,155,60,.08)",
+          }}>{f.icon}</div>
+          <div style={{ fontSize: 10.5, lineHeight: 1.5, color: light ? "#D8C4A8" : COLORS.inkSoft, fontWeight: 600 }}>
+            {f.t1}<br />{f.t2}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -460,31 +516,53 @@ function CustomerOrderForm() {
   };
 
   const card = {
-    maxWidth: 460, width: "100%", position: "relative",
-    background: "rgba(255,255,255,0.94)", backdropFilter: "blur(10px)",
-    borderRadius: 22, padding: 26,
-    border: "1px solid rgba(255,255,255,0.6)",
-    boxShadow: "0 24px 60px rgba(43,27,18,.34)",
+    maxWidth: 470, width: "100%", position: "relative",
+    background: `linear-gradient(168deg, ${CREAM} 0%, #F3E8D4 100%)`,
+    borderRadius: 26, padding: "28px 24px",
+    border: `1.5px solid ${GOLD}`,
+    boxShadow: "0 30px 80px rgba(0,0,0,.55), inset 0 0 0 5px rgba(255,255,255,.5)",
+    color: COLORS.ink,
+  };
+  const fieldStyle = {
+    padding: "12px 13px", borderRadius: 11,
+    border: "1px solid rgba(200,155,60,.42)",
+    fontSize: 13.5, width: "100%",
+    background: "rgba(255,255,255,.82)", color: COLORS.ink,
+  };
+  const labelStyle = { fontSize: 12.5, color: COLORS.inkSoft, fontWeight: 600 };
+  const goldHeading = {
+    fontFamily: "Cairo, sans-serif", fontWeight: 900,
+    background: `linear-gradient(180deg, #8F6420 0%, ${GOLD} 45%, #7A5518 100%)`,
+    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
   };
   const wrap = {
     minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
     padding: "28px 20px", position: "relative", overflow: "hidden",
   };
 
-  /* خلفية النخيل مع تعتيم متدرّج */
+  /* خلفية: بني دافئ + سعف نخيل باهت */
   const Backdrop = () => (
     <>
+      <div aria-hidden="true" style={{
+        position: "fixed", inset: 0, zIndex: -3,
+        background: "linear-gradient(155deg, #6B4A2E 0%, #4A2511 48%, #2B1B12 100%)",
+      }} />
       <img src="palm.jpeg" alt="" aria-hidden="true"
-        style={{ position: "fixed", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: -2 }} />
+        style={{
+          position: "fixed", inset: 0, width: "100%", height: "100%",
+          objectFit: "cover", zIndex: -2, opacity: 0.16,
+          filter: "grayscale(35%) contrast(115%)",
+        }} />
       <div aria-hidden="true" style={{
         position: "fixed", inset: 0, zIndex: -1,
-        background: "linear-gradient(160deg, rgba(43,27,18,.62) 0%, rgba(74,37,17,.72) 55%, rgba(43,27,18,.86) 100%)",
+        background: "radial-gradient(ellipse at 50% 42%, rgba(201,155,90,.16) 0%, rgba(0,0,0,0) 62%)",
       }} />
     </>
   );
 
   if (ordersOpen === null) {
-    return <div dir="rtl" style={wrap}><Backdrop /><div style={{ color: "#F3E9D8" }}>جارٍ التحميل…</div></div>;
+    return <div dir="rtl" style={wrap}><Backdrop /><div style={{ color: CREAM }}>جارٍ التحميل…</div></div>;
   }
 
   if (!ordersOpen) {
@@ -493,10 +571,10 @@ function CustomerOrderForm() {
         <Backdrop />
         <div style={{ ...card, textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🌴</div>
-          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep, marginBottom: 8 }}>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19, color: COLORS.deep, marginBottom: 8 }}>
             نفذت الكمية حالياً
           </div>
-          <div style={{ fontSize: 13.5, color: COLORS.inkSoft, lineHeight: 1.9 }}>
+          <div style={{ fontSize: 13.5, color: COLORS.inkSoft, lineHeight: 2 }}>
             نعتذر، استقبال الطلبات متوقف مؤقتاً لحين توفر إنتاج جديد.
             <br />نشكر لكم اهتمامكم، وسنستقبل طلباتكم فور توفر الكمية بإذن الله.
           </div>
@@ -512,27 +590,37 @@ function CustomerOrderForm() {
         <div style={{ marginBottom: 16 }}>
           <LogoLockup size={50} center />
         </div>
-        <div style={{ borderRadius: 16, overflow: "hidden", marginBottom: 18, position: "relative", boxShadow: "0 10px 26px rgba(74,37,17,.2)" }}>
-          <img src="pour.jpeg" alt="دبس التمر" style={{ width: "100%", height: 190, objectFit: "cover", display: "block" }} />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(43,27,18,.55), rgba(43,27,18,0) 55%)" }} />
-          <span style={{ position: "absolute", top: 12, insetInlineStart: 12, background: "rgba(107,122,58,.95)", color: "#fff", borderRadius: 20, padding: "5px 13px", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>
-            🌿 ORGANIC
-          </span>
-          <div style={{ position: "absolute", bottom: 12, insetInlineStart: 14, color: "#FBF6EC", fontSize: 12.5, fontWeight: 700, textShadow: "0 1px 6px rgba(0,0,0,.5)" }}>
-            {BOX_SIZE_KG} كجم · {DEFAULT_BOX_PRICE} درهم للعلبة
+        <div style={{ position: "relative", marginBottom: 20 }}>
+          <div style={{ borderRadius: 18, overflow: "hidden", border: `1.5px solid ${GOLD}`, boxShadow: "0 12px 30px rgba(74,37,17,.28)" }}>
+            <img src="pour.jpeg" alt="دبس التمر" style={{ width: "100%", height: 235, objectFit: "cover", objectPosition: "center 38%", display: "block" }} />
+            <div style={{ position: "absolute", inset: 0, borderRadius: 18, background: "linear-gradient(to top, rgba(43,27,18,.9) 3%, rgba(43,27,18,.08) 45%, rgba(43,27,18,.3) 100%)" }} />
+            <div style={{ position: "absolute", bottom: 15, insetInlineStart: 17, insetInlineEnd: 17 }}>
+              <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 900, fontSize: 21, color: GOLD_LIGHT, lineHeight: 1.3, textShadow: "0 2px 8px rgba(0,0,0,.6)" }}>
+                دبس كهرماني
+              </div>
+              <div style={{ fontSize: 12, color: "#E3D3BB", marginTop: 3 }}>
+                المنّ — {BOX_SIZE_KG} كجم · {DEFAULT_BOX_PRICE} درهم
+              </div>
+            </div>
+          </div>
+          <div style={{ position: "absolute", top: -12, insetInlineStart: -8, filter: "drop-shadow(0 6px 14px rgba(0,0,0,.4))" }}>
+            <OrganicSeal size={62} />
           </div>
         </div>
+
+        <FeatureRow />
+        <Divider />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
-          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: COLORS.deep }}>تسجيل طلب دبس</div>
+          <div style={{ ...goldHeading, fontSize: 23, textAlign: "center", width: "100%" }}>تسجيل طلب دبس</div>
         </div>
-        <div style={{ fontSize: 12, color: COLORS.inkSoft, marginBottom: 14, lineHeight: 1.8 }}>
+        <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 14, lineHeight: 1.9, textAlign: "center" }}>
           دبس تمر من نخيل المزرعة — مكوّن واحد فقط: التمر.
         </div>
         <a href="#story" style={{
           display: "block", textDecoration: "none", marginBottom: 18,
-          background: COLORS.amberLight, borderRadius: 12, padding: "11px 14px",
+          background: "rgba(200,155,60,.13)", borderRadius: 12, padding: "12px 14px",
           fontSize: 12.5, color: COLORS.deep, fontWeight: 700, textAlign: "center",
-          border: `1px solid ${COLORS.line}`,
+          border: `1px solid ${GOLD}`,
         }}>
           🌴 رحلة المنتج — من النخلة للمدبسة ←
         </a>
@@ -540,43 +628,43 @@ function CustomerOrderForm() {
         {status === "done" ? (
           <div style={{ textAlign: "center", padding: "24px 8px" }}>
             <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
-            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 700, fontSize: 16, color: COLORS.deep }}>تم استلام طلبك بنجاح</div>
-            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 6, lineHeight: 1.9 }}>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 700, fontSize: 17, color: COLORS.deep }}>تم استلام طلبك بنجاح</div>
+            <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 8, lineHeight: 2 }}>
               سيتم التواصل معك لتأكيد الطلب، وتحديد موعد التسليم حسب توفر الإنتاج.
               <br />
-              <b style={{ color: COLORS.secondary }}>الدفع عند الاستلام.</b>
+              <b style={{ color: "#4C6B2F" }}>الدفع عند الاستلام.</b>
             </div>
           </div>
         ) : (
           <form onSubmit={submit}>
             <div style={{ display: "grid", gap: 12 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>الاسم
-                  <input required value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                <label style={labelStyle}>الاسم
+                  <input required value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} style={{ ...fieldStyle, marginTop: 4 }} />
                 </label>
-                <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>اللقب
-                  <input value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                <label style={labelStyle}>اللقب
+                  <input value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} style={{ ...fieldStyle, marginTop: 4 }} />
                 </label>
               </div>
 
-              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>رقم التواصل (واتساب)
-                <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="مثال: 0501234567" style={{ ...inputStyle, marginTop: 4 }} />
+              <label style={labelStyle}>رقم التواصل (واتساب)
+                <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="مثال: 0501234567" style={{ ...fieldStyle, marginTop: 4 }} />
               </label>
 
-              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>الكمية المطلوبة (عدد العلب)
-                <input required type="number" min="1" value={form.qty} onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              <label style={labelStyle}>الكمية المطلوبة (عدد العلب)
+                <input required type="number" min="1" value={form.qty} onChange={(e) => setForm((f) => ({ ...f, qty: e.target.value }))} style={{ ...fieldStyle, marginTop: 4 }} />
               </label>
               <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>العلبة الواحدة {BOX_SIZE_KG} كجم (منّ) بسعر {DEFAULT_BOX_PRICE} درهم.</div>
 
               <div>
-                <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 6 }}>طريقة الاستلام</div>
+                <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 8, fontWeight: 600 }}>طريقة الاستلام</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {["استلام", "توصيل"].map((opt) => (
                     <button key={opt} type="button" onClick={() => setForm((f) => ({ ...f, fulfillment: opt }))}
                       style={{
                         padding: "10px 8px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700,
-                        border: `1px solid ${form.fulfillment === opt ? COLORS.primary : COLORS.line}`,
-                        background: form.fulfillment === opt ? COLORS.primary : "#fff",
+                        border: `1px solid ${form.fulfillment === opt ? COLORS.primary : "rgba(200,155,60,.4)"}`,
+                        background: form.fulfillment === opt ? COLORS.primary : "rgba(255,255,255,.7)",
                         color: form.fulfillment === opt ? "#fff" : COLORS.inkSoft,
                       }}>
                       {opt === "استلام" ? "🏠 استلام من المزرعة" : "🚚 توصيل"}
@@ -586,28 +674,28 @@ function CustomerOrderForm() {
               </div>
 
               {form.fulfillment === "توصيل" && (
-                <div style={{ display: "grid", gap: 10, background: COLORS.amberLight, padding: 12, borderRadius: 12 }}>
-                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>الإمارة
-                    <select required value={form.emirate} onChange={(e) => setForm((f) => ({ ...f, emirate: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }}>
+                <div style={{ display: "grid", gap: 10, background: "rgba(200,155,60,.1)", padding: 14, borderRadius: 14, border: "1px solid rgba(200,155,60,.3)" }}>
+                  <label style={labelStyle}>الإمارة
+                    <select required value={form.emirate} onChange={(e) => setForm((f) => ({ ...f, emirate: e.target.value }))} style={{ ...fieldStyle, marginTop: 4 }}>
                       <option value="">— اختر —</option>
                       {EMIRATES.map((em) => <option key={em} value={em}>{em}</option>)}
                     </select>
                   </label>
-                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>المنطقة
-                    <input required value={form.area} onChange={(e) => setForm((f) => ({ ...f, area: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                  <label style={labelStyle}>المنطقة
+                    <input required value={form.area} onChange={(e) => setForm((f) => ({ ...f, area: e.target.value }))} style={{ ...fieldStyle, marginTop: 4 }} />
                   </label>
-                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>رقم المنزل / الفيلا
-                    <input required value={form.house_number} onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+                  <label style={labelStyle}>رقم المنزل / الفيلا
+                    <input required value={form.house_number} onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))} style={{ ...fieldStyle, marginTop: 4 }} />
                   </label>
                   <div>
-                    <div style={{ fontSize: 12.5, color: COLORS.deep, marginBottom: 6 }}>موقع التوصيل</div>
+                    <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 6, fontWeight: 600 }}>موقع التوصيل</div>
                     <button type="button" onClick={shareLocation} disabled={geo === "loading"}
                       style={{
                         width: "100%", padding: "11px 14px", borderRadius: 10, cursor: "pointer",
                         fontSize: 13, fontWeight: 700,
                         border: `1px solid ${geo === "done" ? COLORS.secondary : COLORS.primary}`,
-                        background: geo === "done" ? "#E7F0D8" : "#fff",
-                        color: geo === "done" ? COLORS.secondary : COLORS.primary,
+                        background: geo === "done" ? "rgba(76,107,47,.14)" : "rgba(255,255,255,.75)",
+                        color: geo === "done" ? "#4C6B2F" : COLORS.primary,
                       }}>
                       {geo === "loading" ? "جارٍ تحديد الموقع…"
                         : geo === "done" ? "✓ تم تحديد موقعك"
@@ -622,23 +710,23 @@ function CustomerOrderForm() {
                       يساعد المندوب على الوصول إليك بدقة.
                     </div>
                   </div>
-                  <label style={{ fontSize: 12.5, color: COLORS.deep }}>وصف الموقع (اختياري)
-                    <input value={form.delivery_location} onChange={(e) => setForm((f) => ({ ...f, delivery_location: e.target.value }))} placeholder="أقرب معلم أو وصف مختصر" style={{ ...inputStyle, marginTop: 4 }} />
+                  <label style={labelStyle}>وصف الموقع (اختياري)
+                    <input value={form.delivery_location} onChange={(e) => setForm((f) => ({ ...f, delivery_location: e.target.value }))} placeholder="أقرب معلم أو وصف مختصر" style={{ ...fieldStyle, marginTop: 4 }} />
                   </label>
                   {form.emirate && (
-                    <div style={{ fontSize: 12, color: COLORS.deep, fontWeight: 700 }}>
+                    <div style={{ fontSize: 12.5, color: COLORS.deep, fontWeight: 700 }}>
                       رسوم التوصيل: {fmt(deliveryFee)} درهم
                     </div>
                   )}
                 </div>
               )}
 
-              <label style={{ fontSize: 12.5, color: COLORS.inkSoft }}>ملاحظات (اختياري)
-                <input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, marginTop: 4 }} />
+              <label style={labelStyle}>ملاحظات (اختياري)
+                <input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} style={{ ...fieldStyle, marginTop: 4 }} />
               </label>
 
               {num(form.qty) > 0 && (
-                <div style={{ background: "#fff", border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: 12, fontSize: 13 }}>
+                <div style={{ background: "rgba(255,255,255,.8)", border: `1px solid ${GOLD}`, borderRadius: 12, padding: 14, fontSize: 13 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                     <span style={{ color: COLORS.inkSoft }}>{fmt(num(form.qty))} علبة × {DEFAULT_BOX_PRICE}</span>
                     <span>{fmt(boxesTotal)}</span>
@@ -649,11 +737,11 @@ function CustomerOrderForm() {
                       <span>{fmt(deliveryFee)}</span>
                     </div>
                   )}
-                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${COLORS.line}`, paddingTop: 6, marginTop: 6, fontWeight: 800, color: COLORS.deep }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: `1px solid ${GOLD}`, paddingTop: 8, marginTop: 8, fontWeight: 800, color: COLORS.deep, fontSize: 15 }}>
                     <span>الإجمالي</span>
                     <span>{fmt(grandTotal)} درهم</span>
                   </div>
-                  <div style={{ marginTop: 10, background: "#E7F0D8", color: COLORS.secondary, borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, textAlign: "center" }}>
+                  <div style={{ marginTop: 10, background: "rgba(76,107,47,.15)", color: "#4C6B2F", borderRadius: 8, padding: "8px 10px", fontSize: 12, fontWeight: 700, textAlign: "center" }}>
                     💵 الدفع عند الاستلام
                   </div>
                 </div>
@@ -914,7 +1002,7 @@ const STORY_STEPS = [
     note: "حبة حبة — ما تعدّي وحدة",
   },
   {
-    a: "madbasa.jpeg", b: "pour.jpeg",
+    a: "madbasa.jpeg", b: "filling.jpeg",
     kicker: "السر",
     title: "المدبسة",
     text: "هني يصير الشغل كله. غرفة محكمة الإغلاق، عديمة التهوية، ترتفع حرارتها بأشعة الشمس. تكدّس الأنواط فوق بعض، وثقلها مع الحرارة تسيل قطرات الدبس على مدى الأيام. يُجمع من كل مدبسة على حدة، ثم يدخل خزان التعبئة.",
@@ -1061,6 +1149,67 @@ function StoryPage() {
   );
 }
 
+/* ============ شريط الأدوات: الفلترة والتصدير ============ */
+
+function ToolsBar({ range, setRange, onExportBackup, onExportCSV }) {
+  const preset = (days) => {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(to.getDate() - days);
+    setRange({ from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) });
+  };
+  const active = range.from || range.to;
+
+  return (
+    <div style={{
+      background: COLORS.surface, border: `1px solid ${COLORS.line}`,
+      borderRadius: 14, padding: 14, marginBottom: 18,
+    }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft, flex: "1 1 130px" }}>
+          من تاريخ
+          <input type="date" value={range.from}
+            onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+            style={{ ...inputStyle, marginTop: 4 }} />
+        </label>
+        <label style={{ fontSize: 12, color: COLORS.inkSoft, flex: "1 1 130px" }}>
+          إلى تاريخ
+          <input type="date" value={range.to}
+            onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+            style={{ ...inputStyle, marginTop: 4 }} />
+        </label>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 12 }}>
+        {[{ l: "آخر ٣٠ يوم", d: 30 }, { l: "آخر ٣ شهور", d: 90 }, { l: "آخر سنة", d: 365 }].map((b) => (
+          <button key={b.d} onClick={() => preset(b.d)} style={{ ...ghostBtnStyle, padding: "7px 12px", fontSize: 12 }}>
+            {b.l}
+          </button>
+        ))}
+        {active && (
+          <button onClick={() => setRange({ from: "", to: "" })}
+            style={{ ...ghostBtnStyle, padding: "7px 12px", fontSize: 12, color: COLORS.alert, borderColor: COLORS.alert }}>
+            ✕ إلغاء الفلترة
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
+        <button onClick={onExportCSV} style={{ ...ghostBtnStyle, padding: "7px 12px", fontSize: 12 }}>
+          📊 تصدير تقرير
+        </button>
+        <button onClick={onExportBackup} style={{ ...primaryBtnStyle, padding: "7px 12px", fontSize: 12 }}>
+          💾 نسخة احتياطية
+        </button>
+      </div>
+
+      {active && (
+        <div style={{ fontSize: 11.5, color: COLORS.primary, marginTop: 10, fontWeight: 600 }}>
+          الأرقام المعروضة للفترة: {range.from || "البداية"} ← {range.to || "اليوم"}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ============ التطبيق الرئيسي (بعد تسجيل الدخول) ============ */
 function MainApp({ session }) {
   const [tab, setTab] = useState("dashboard");
@@ -1094,6 +1243,52 @@ function MainApp({ session }) {
     setLoaded(true);
   }, []);
 
+  /* ===== فلترة بالتاريخ ===== */
+  const [range, setRange] = useState({ from: "", to: "" });
+  const dateKeyOf = (key) => (key === "bags" ? "entry_date" : key === "orders" ? "order_date" : "date");
+  const inRange = useCallback((row, key) => {
+    const d = row[dateKeyOf(key)];
+    if (!range.from && !range.to) return true;
+    if (!d) return false;
+    if (range.from && d < range.from) return false;
+    if (range.to && d > range.to) return false;
+    return true;
+  }, [range]);
+
+  /* ===== نسخة احتياطية ===== */
+  const exportBackup = () => {
+    const payload = { exported_at: new Date().toISOString(), brand: BRAND_NAME, data, incoming, cancelled };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `نسخة-احتياطية-${todayISO()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast("تم تنزيل النسخة الاحتياطية");
+  };
+
+  const exportCSV = () => {
+    const lines = [];
+    for (const key of Object.keys(TABLES)) {
+      const cfg = TABLES[key];
+      const rows = (computedRows[key] || []).filter((r) => inRange(r, key));
+      if (!rows.length) continue;
+      lines.push(cfg.label);
+      lines.push(cfg.display.map((d) => (cfg.columns.find((cc) => cc.key === d)?.label || d)).join(","));
+      rows.forEach((r) => {
+        lines.push(cfg.display.map((d) => `"${String(r[d] ?? "").replace(/"/g, '""')}"`).join(","));
+      });
+      lines.push("");
+    }
+    const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `تقرير-${todayISO()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast("تم تنزيل التقرير");
+  };
+
   const toggleOrders = async () => {
     const next = !ordersOpen;
     await setSetting("orders_open", next);
@@ -1109,8 +1304,14 @@ function MainApp({ session }) {
     return out;
   }, [data]);
 
-  const dash = useMemo(() => computeDash(computedRows), [computedRows]);
-  const sourceSummary = useMemo(() => computeSourceSummary(computedRows), [computedRows]);
+  const filteredRows = useMemo(() => {
+    const out = {};
+    for (const key of Object.keys(TABLES)) out[key] = (computedRows[key] || []).filter((r) => inRange(r, key));
+    return out;
+  }, [computedRows, inRange]);
+
+  const dash = useMemo(() => computeDash(filteredRows), [filteredRows]);
+  const sourceSummary = useMemo(() => computeSourceSummary(filteredRows), [filteredRows]);
 
   const partnersDistribution = useMemo(() => {
     const netFarm = sourceSummary.farm.net;
@@ -1219,6 +1420,9 @@ function MainApp({ session }) {
       </nav>
 
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "18px 16px 60px" }}>
+        {(tab === "dashboard" || tab === "sources") && (
+          <ToolsBar range={range} setRange={setRange} onExportBackup={exportBackup} onExportCSV={exportCSV} />
+        )}
         {tab === "dashboard" && <Dashboard dash={dash} />}
         {tab === "sources" && <SourceSummary summary={sourceSummary} />}
         {tab === "partners" && <Partners partners={data.partners} distribution={partnersDistribution} withdrawals={data.withdrawals} boughtNet={sourceSummary.bought.net} onReload={loadAll} showToast={showToast} />}
@@ -1516,6 +1720,61 @@ function IncomingOrders({ incoming, cancelled, onAccept, onCancel, ordersOpen, o
   );
 }
 
+function printPartnerStatement(partner, row, withdrawals) {
+  const list = (withdrawals || []).filter((w) => w.partner_name === partner.name);
+  const valueOf = (w) => (w.type === "علب دبس" ? num(w.qty) * DEFAULT_BOX_PRICE : num(w.amount));
+  const rows = list.map((w) => `
+    <tr>
+      <td>${w.date || ""}</td>
+      <td>${w.type || ""}</td>
+      <td>${w.type === "علب دبس" ? fmt(w.qty) + " علبة" : fmt(w.amount)}</td>
+      <td>${fmt(valueOf(w))}</td>
+      <td>${w.notes || ""}</td>
+    </tr>`).join("");
+
+  const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8" />
+  <title>كشف حساب — ${partner.name}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;700&display=swap" />
+  <style>
+    body { font-family: Tajawal, sans-serif; color: #2B1B12; padding: 34px; }
+    h1 { font-family: Cairo, sans-serif; font-size: 21px; margin: 0 0 4px; }
+    .sub { color: #6B5342; font-size: 12.5px; margin-bottom: 20px; }
+    .cards { display: flex; gap: 12px; margin-bottom: 22px; }
+    .card { flex: 1; border: 1px solid #E7DAC5; border-radius: 12px; padding: 14px; }
+    .card .l { font-size: 11.5px; color: #6B5342; }
+    .card .v { font-family: Cairo, sans-serif; font-weight: 800; font-size: 19px; margin-top: 5px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { border: 1px solid #E7DAC5; padding: 8px 10px; text-align: right; }
+    th { background: #FAF3E6; font-weight: 700; }
+    .foot { margin-top: 26px; font-size: 11px; color: #6B5342; border-top: 1px solid #E7DAC5; padding-top: 12px; }
+    @media print { body { padding: 12px; } }
+  </style></head><body>
+    <h1>كشف حساب شريك — ${partner.name}</h1>
+    <div class="sub">${BRAND_NAME} · نظام إدارة التمر والدبس · تاريخ الإصدار: ${todayISO()}</div>
+    <div class="cards">
+      <div class="card"><div class="l">نسبة الشراكة</div><div class="v">${fmt(partner.pct, 2)}%</div></div>
+      <div class="card"><div class="l">المستحق</div><div class="v" style="color:#6B7A3A">${fmt(row.share)}</div></div>
+      <div class="card"><div class="l">المسحوب</div><div class="v" style="color:#B5651D">${fmt(row.withdrawn)}</div></div>
+      <div class="card"><div class="l">المتبقي</div><div class="v" style="color:${row.remaining >= 0 ? "#6B7A3A" : "#A63A32"}">${fmt(row.remaining)}</div></div>
+    </div>
+    <h3 style="font-family:Cairo;font-size:15px;margin:0 0 10px">سجل السحوبات</h3>
+    <table>
+      <thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية/المبلغ</th><th>القيمة (درهم)</th><th>ملاحظات</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#6B5342">لا توجد سحوبات</td></tr>'}</tbody>
+    </table>
+    <div class="foot">
+      المستحق محسوب من صافي عائد إنتاج المزرعة وفق نسبة الشراكة. قيمة علبة الدبس ${DEFAULT_BOX_PRICE} درهم.
+    </div>
+    <script>window.onload = () => window.print();<\/script>
+  </body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) return false;
+  w.document.write(html);
+  w.document.close();
+  return true;
+}
+
 function Partners({ partners, distribution, withdrawals, boughtNet, onReload, showToast }) {
   const [wForm, setWForm] = useState({ date: todayISO(), partner_name: "", type: "نقدي", qty: "", amount: "", notes: "" });
   const [showForm, setShowForm] = useState(false);
@@ -1550,6 +1809,9 @@ function Partners({ partners, distribution, withdrawals, boughtNet, onReload, sh
                 <input defaultValue={p.name} onBlur={(e) => updatePartner(p, "name", e.target.value)} style={{ ...inputStyle, flex: "1 1 140px" }} />
                 <input type="number" defaultValue={p.pct} onBlur={(e) => updatePartner(p, "pct", e.target.value)} style={{ ...inputStyle, width: 80 }} />
                 <span style={{ fontSize: 13 }}>%</span>
+                <button onClick={() => {
+                  if (!printPartnerStatement(p, row, withdrawals)) showToast("اسمح بالنوافذ المنبثقة للطباعة");
+                }} style={{ ...ghostBtnStyle, padding: "6px 12px", fontSize: 12 }}>🖨️ كشف حساب</button>
                 <button onClick={() => removePartner(p.id)} style={dangerBtnStyle}>حذف</button>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginTop: 10, fontSize: 12.5 }}>
