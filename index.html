@@ -186,9 +186,9 @@ const TABLES = {
           remainingForCustomer = Math.max(0, num(order.qty_requested) - deliveredTotal);
         }
       }
-      return { ...row, total, weight_kg: row.qty ? num(row.qty) * BOX_SIZE_KG : "", remaining_for_customer: remainingForCustomer };
+      return { ...row, total, remaining_for_customer: remainingForCustomer };
     },
-    display: ["date", "order_id", "source", "customer", "qty", "unit_price", "weight_kg", "total", "remaining_for_customer", "payment_method", "notes"],
+    display: ["date", "order_id", "source", "customer", "qty", "unit_price", "total", "remaining_for_customer", "payment_method", "notes"],
   },
   nafia: {
     label: "النفيعة", icon: "🌿", table: "nafia",
@@ -1247,142 +1247,372 @@ function CollectionsPanel({ sales, onReload, showToast }) {
 
 /* ============ تسليم الطلبات ============ */
 
-function DeliveryPanel({ orders, onReload, showToast, boxPrice }) {
-  const [busy, setBusy] = useState(null);
-  const [partial, setPartial] = useState({});  // { orderId: qty }
-  const [price, setPrice] = useState({});      // { orderId: unit_price }
-  const [pay, setPay] = useState({});          // { orderId: "كاش" | "تحويل بنكي" }
+/* بطاقة تفاصيل الطلب — تعديل، تسليم، تراجع، إعادة */
+function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice }) {
+  const [busy, setBusy] = useState("");
+  const [edit, setEdit] = useState({
+    customer_name: order.customer_name || "",
+    qty_requested: order.qty_requested ?? "",
+    order_date: order.order_date || "",
+    notes: order.notes || "",
+  });
+  const [qty, setQty] = useState("");
+  const [price, setPrice] = useState(boxPrice);
+  const [pay, setPay] = useState("كاش");
+  const [editLine, setEditLine] = useState(null);   // id السطر تحت التعديل
+  const [lineDraft, setLineDraft] = useState({ qty: "", unit_price: "" });
 
-  const openOrders = useMemo(
-    () => (orders || []).filter((o) => num(o.remaining) > 0),
-    [orders]
+  const lines = useMemo(
+    () => (sales || []).filter((s) => s.order_id === order.id).sort((a, b) => (b.id || 0) - (a.id || 0)),
+    [sales, order.id]
   );
+  const delivered = lines.reduce((s, r) => s + num(r.qty), 0);
+  const req = num(order.qty_requested);
+  const rem = Math.max(0, req - delivered);
+  const pct = req > 0 ? Math.round((delivered / req) * 100) : 0;
+  const totalValue = lines.reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
+  const collectedValue = lines.filter((r) => r.collected).reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
+  const dueValue = totalValue - collectedValue;
 
-  const deliver = async (o, qty, collected) => {
-    const q = num(qty);
-    const up = num(price[o.id] ?? boxPrice);
-    const method = pay[o.id] || "كاش";
+  const run = async (key, fn, okMsg) => {
+    setBusy(key);
+    try { await fn(); await onReload(); if (okMsg) showToast(okMsg); }
+    catch (err) { console.error(err); showToast("تعذّر تنفيذ العملية"); }
+    setBusy("");
+  };
+
+  /* حفظ تعديل بيانات الطلب */
+  const saveOrder = () => run("order", async () => {
+    await updateRow("orders", order.id, {
+      customer_name: edit.customer_name,
+      qty_requested: edit.qty_requested === "" ? null : num(edit.qty_requested),
+      order_date: edit.order_date || null,
+      notes: edit.notes || null,
+    });
+  }, "تم حفظ التعديل");
+
+  /* تسجيل تسليم جديد */
+  const deliver = (collected) => {
+    const q = num(qty || rem);
+    const up = num(price);
     if (q <= 0) { showToast("أدخل كمية صحيحة"); return; }
-    if (q > num(o.remaining)) { showToast("الكمية أكبر من المتبقي"); return; }
+    if (q > rem) { showToast("الكمية أكبر من المتبقي"); return; }
     if (up <= 0) { showToast("أدخل سعراً صحيحاً"); return; }
-    const total = q * up;
-    const msg = collected
-      ? `تسليم ${fmt(q)} علبة إلى ${o.customer_name}\nالإجمالي ${fmt(total)} درهم — محصّل (${method})؟`
-      : `تسليم ${fmt(q)} علبة إلى ${o.customer_name}\nالإجمالي ${fmt(total)} درهم — غير محصّل بعد؟`;
-    if (!window.confirm(msg)) return;
-
-    setBusy(o.id);
-    try {
+    run("deliver", async () => {
       await insertRow("sales", {
-        date: todayISO(),
-        order_id: o.id,
-        customer: o.customer_name,
-        qty: q,
-        unit_price: up,
-        payment_method: collected ? method : null,
+        date: todayISO(), order_id: order.id, customer: order.customer_name,
+        qty: q, unit_price: up,
+        payment_method: collected ? pay : null,
         collected: !!collected,
         collected_at: collected ? todayISO() : null,
         notes: "تسليم من قائمة الطلبات",
       });
-      setPartial((p) => ({ ...p, [o.id]: "" }));
-      await onReload();
-      showToast(q === num(o.remaining) ? "تم تسليم الطلب كاملاً ✅" : `تم تسليم ${fmt(q)} علبة (جزئي)`);
-    } catch (err) {
-      console.error(err);
-      showToast("تعذّر تسجيل التسليم");
-    }
-    setBusy(null);
+      setQty("");
+    }, q < rem
+      ? `تسليم جزئي ${fmt(q)} علبة — بقي ${fmt(rem - q)} بانتظار التسليم`
+      : (collected ? "تم تسليم الطلب كاملاً ✅" : "تم تسليم الطلب كاملاً (آجل)"));
   };
 
-  if (!openOrders.length) {
+  /* تراجع عن عملية تسليم */
+  const undoLine = (s) => {
+    if (!window.confirm(`تراجع عن تسليم ${fmt(s.qty)} علبة؟\nسترجع الكمية إلى «بانتظار التسليم».`)) return;
+    run("l" + s.id, async () => { await deleteRow("sales", s.id); }, "تم التراجع — رجعت الكمية للانتظار");
+  };
+
+  /* تبديل حالة التحصيل */
+  const toggleCollected = (s) => run("c" + s.id, async () => {
+    await updateRow("sales", s.id, s.collected
+      ? { collected: false, collected_at: null, payment_method: null }
+      : { collected: true, collected_at: todayISO(), payment_method: s.payment_method || "كاش" });
+  }, s.collected ? "رجع المبلغ إلى الذمم" : "تم تسجيل التحصيل ✅");
+
+  /* حفظ تعديل سطر تسليم */
+  const saveLine = (s) => run("e" + s.id, async () => {
+    const q = num(lineDraft.qty), up = num(lineDraft.unit_price);
+    if (q <= 0 || up <= 0) throw new Error("قيم غير صحيحة");
+    await updateRow("sales", s.id, { qty: q, unit_price: up });
+    setEditLine(null);
+  }, "تم حفظ التعديل");
+
+  const overlay = {
+    position: "fixed", inset: 0, background: "rgba(43,27,18,.55)", zIndex: 50,
+    display: "flex", alignItems: "flex-start", justifyContent: "center",
+    padding: "20px 12px", overflowY: "auto",
+  };
+  const sheet = {
+    background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.line}`,
+    width: "100%", maxWidth: 560, padding: 18, marginTop: 10,
+  };
+  const lbl = { fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 600 };
+
+  return (
+    <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={sheet} dir="rtl">
+        {/* الرأس */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
+          <div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: COLORS.deep }}>
+              {order.customer_name}
+            </div>
+            <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 3 }}>
+              طلب #{order.id}{order.order_date ? ` · ${order.order_date}` : ""}
+            </div>
+            <span style={{
+              display: "inline-block", marginTop: 7, borderRadius: 20, padding: "3px 12px",
+              fontSize: 11, fontWeight: 800,
+              background: rem === 0 ? "rgba(107,122,58,.15)" : delivered > 0 ? "rgba(181,101,29,.15)" : COLORS.amberLight,
+              color: rem === 0 ? COLORS.secondary : delivered > 0 ? COLORS.primary : COLORS.inkSoft,
+            }}>
+              {rem === 0 ? "مكتمل" : delivered > 0 ? `جزئي — بانتظار ${fmt(rem)}` : "بانتظار التسليم"}
+            </span>
+          </div>
+          <button onClick={onClose} style={{ ...ghostBtnStyle, padding: "6px 12px", fontSize: 13 }}>✕</button>
+        </div>
+
+        {/* الملخص */}
+        <div style={{ background: COLORS.bg, borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+            <span>مطلوب <b>{fmt(req)}</b></span>
+            <span style={{ color: COLORS.secondary }}>سُلّم <b>{fmt(delivered)}</b></span>
+            <span style={{ color: rem > 0 ? COLORS.alert : COLORS.secondary }}>متبقٍ <b>{fmt(rem)}</b></span>
+          </div>
+          <div style={{ height: 6, background: COLORS.line, borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: rem === 0 ? COLORS.secondary : COLORS.primary }} />
+          </div>
+          {totalValue > 0 && (
+            <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 9, lineHeight: 1.9 }}>
+              قيمة المُسلّم: <b style={{ color: COLORS.deep }}>{fmt(totalValue)} درهم</b>
+              {dueValue > 0 && <span style={{ color: COLORS.alert }}> · بالذمم {fmt(dueValue)}</span>}
+            </div>
+          )}
+        </div>
+
+        {/* تسليم جديد */}
+        {rem > 0 && (
+          <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: 13, marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.deep, marginBottom: 10 }}>تسجيل تسليم</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <label style={{ ...lbl, flex: "1 1 80px" }}>الكمية
+                <input type="number" min="1" max={rem} value={qty} placeholder={`${rem}`}
+                  onChange={(e) => setQty(e.target.value)} style={{ ...inputStyle, marginTop: 4, textAlign: "center" }} />
+              </label>
+              <label style={{ ...lbl, flex: "1 1 90px" }}>سعر العلبة
+                <input type="number" min="0" value={price}
+                  onChange={(e) => setPrice(e.target.value)} style={{ ...inputStyle, marginTop: 4, textAlign: "center" }} />
+              </label>
+              <label style={{ ...lbl, flex: "1 1 100px" }}>التحصيل
+                <select value={pay} onChange={(e) => setPay(e.target.value)} style={{ ...inputStyle, marginTop: 4 }}>
+                  {COLLECT_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </label>
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.deep, fontWeight: 700, margin: "10px 0" }}>
+              الإجمالي: {fmt(num(qty || rem) * num(price))} درهم
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button disabled={busy === "deliver"} onClick={() => deliver(true)}
+                style={{ ...primaryBtnStyle, background: COLORS.secondary, flex: 1, opacity: busy === "deliver" ? 0.6 : 1 }}>
+                ✓ سلّم وحصّل
+              </button>
+              <button disabled={busy === "deliver"} onClick={() => deliver(false)}
+                style={{ ...ghostBtnStyle, opacity: busy === "deliver" ? 0.6 : 1 }}>
+                آجل
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* سجل التسليمات */}
+        <div style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.deep, marginBottom: 9 }}>
+          سجل التسليمات {lines.length > 0 && <span style={{ color: COLORS.inkSoft, fontWeight: 500 }}>({lines.length})</span>}
+        </div>
+        {lines.length === 0 ? (
+          <div style={{ background: COLORS.bg, borderRadius: 10, padding: "16px 12px", textAlign: "center", color: COLORS.inkSoft, fontSize: 12.5, marginBottom: 16 }}>
+            لم يُسلَّم شيء بعد.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+            {lines.map((s) => {
+              const editing = editLine === s.id;
+              return (
+                <div key={s.id} style={{
+                  background: COLORS.bg, borderRadius: 10, padding: "10px 12px",
+                  border: `1px solid ${COLORS.line}`,
+                  borderInlineStart: `4px solid ${s.collected ? COLORS.secondary : COLORS.alert}`,
+                }}>
+                  {editing ? (
+                    <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+                      <input type="number" min="1" value={lineDraft.qty}
+                        onChange={(e) => setLineDraft((d) => ({ ...d, qty: e.target.value }))}
+                        style={{ ...inputStyle, width: 70, textAlign: "center" }} />
+                      <span style={{ fontSize: 11, color: COLORS.inkSoft }}>×</span>
+                      <input type="number" min="0" value={lineDraft.unit_price}
+                        onChange={(e) => setLineDraft((d) => ({ ...d, unit_price: e.target.value }))}
+                        style={{ ...inputStyle, width: 80, textAlign: "center" }} />
+                      <button disabled={busy === "e" + s.id} onClick={() => saveLine(s)}
+                        style={{ ...primaryBtnStyle, padding: "6px 12px", fontSize: 12 }}>حفظ</button>
+                      <button onClick={() => setEditLine(null)}
+                        style={{ ...ghostBtnStyle, padding: "6px 12px", fontSize: 12 }}>إلغاء</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: 12.5, flex: "1 1 130px" }}>
+                        <b>{fmt(s.qty)} علبة</b>
+                        <span style={{ color: COLORS.inkSoft }}> × {fmt(s.unit_price)} = {fmt(num(s.qty) * num(s.unit_price))}</span>
+                        <br />
+                        <span style={{ color: s.collected ? COLORS.secondary : COLORS.alert, fontWeight: 700, fontSize: 11.5 }}>
+                          {s.collected ? `محصّل${s.payment_method ? ` · ${s.payment_method}` : ""}` : "آجل — بالذمم"}
+                        </span>
+                        {s.date && <span style={{ color: COLORS.inkSoft, fontSize: 11 }}> · {s.date}</span>}
+                      </div>
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                        <button onClick={() => toggleCollected(s)} disabled={busy === "c" + s.id}
+                          style={{ ...ghostBtnStyle, padding: "5px 10px", fontSize: 11.5,
+                            color: s.collected ? COLORS.inkSoft : COLORS.secondary,
+                            borderColor: s.collected ? COLORS.line : COLORS.secondary }}>
+                          {s.collected ? "↩️ إلغاء التحصيل" : "💰 حصّل"}
+                        </button>
+                        <button onClick={() => { setEditLine(s.id); setLineDraft({ qty: s.qty ?? "", unit_price: s.unit_price ?? "" }); }}
+                          style={{ ...ghostBtnStyle, padding: "5px 10px", fontSize: 11.5, color: COLORS.primary, borderColor: COLORS.primary }}>
+                          ✏️ تعديل
+                        </button>
+                        <button onClick={() => undoLine(s)} disabled={busy === "l" + s.id}
+                          style={{ ...ghostBtnStyle, padding: "5px 10px", fontSize: 11.5, color: COLORS.alert, borderColor: COLORS.alert }}>
+                          ↩️ تراجع
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* تعديل بيانات الطلب */}
+        <details style={{ borderTop: `1px solid ${COLORS.line}`, paddingTop: 14 }}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, color: COLORS.deep }}>
+            ✏️ تعديل بيانات الطلب
+          </summary>
+          <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+            <label style={lbl}>اسم العميل
+              <input value={edit.customer_name} onChange={(e) => setEdit((f) => ({ ...f, customer_name: e.target.value }))}
+                style={{ ...inputStyle, marginTop: 4 }} />
+            </label>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <label style={{ ...lbl, flex: "1 1 110px" }}>الكمية المطلوبة
+                <input type="number" min="0" value={edit.qty_requested}
+                  onChange={(e) => setEdit((f) => ({ ...f, qty_requested: e.target.value }))}
+                  style={{ ...inputStyle, marginTop: 4 }} />
+              </label>
+              <label style={{ ...lbl, flex: "1 1 130px" }}>تاريخ الطلب
+                <input type="date" value={edit.order_date}
+                  onChange={(e) => setEdit((f) => ({ ...f, order_date: e.target.value }))}
+                  style={{ ...inputStyle, marginTop: 4 }} />
+              </label>
+            </div>
+            <label style={lbl}>ملاحظات
+              <input value={edit.notes} onChange={(e) => setEdit((f) => ({ ...f, notes: e.target.value }))}
+                style={{ ...inputStyle, marginTop: 4 }} />
+            </label>
+            {num(edit.qty_requested) < delivered && (
+              <div style={{ fontSize: 11.5, color: COLORS.alert, fontWeight: 600 }}>
+                ⚠️ الكمية المطلوبة أقل من المُسلّم ({fmt(delivered)}).
+              </div>
+            )}
+            <button disabled={busy === "order"} onClick={saveOrder}
+              style={{ ...primaryBtnStyle, opacity: busy === "order" ? 0.6 : 1 }}>
+              حفظ التعديل
+            </button>
+          </div>
+        </details>
+      </div>
+    </div>
+  );
+}
+
+function DeliveryPanel({ orders, sales, onReload, showToast, boxPrice }) {
+  const [openId, setOpenId] = useState(null);
+  const [showDone, setShowDone] = useState(false);
+
+  const openOrders = useMemo(() => (orders || []).filter((o) => num(o.remaining) > 0), [orders]);
+  const doneOrders = useMemo(
+    () => (orders || []).filter((o) => num(o.remaining) === 0 && num(o.delivered) > 0),
+    [orders]
+  );
+  const selected = (orders || []).find((o) => o.id === openId) || null;
+
+  const Card = ({ o, done }) => {
+    const req = num(o.qty_requested), del = num(o.delivered), rem = num(o.remaining);
+    const pct = req > 0 ? Math.round((del / req) * 100) : 0;
     return (
-      <div style={{
-        background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 14,
-        padding: "22px 16px", marginBottom: 18, textAlign: "center",
-        color: COLORS.inkSoft, fontSize: 13.5,
+      <div onClick={() => setOpenId(o.id)} style={{
+        background: COLORS.bg, borderRadius: 12, padding: "12px 14px", cursor: "pointer",
+        border: `1px solid ${COLORS.line}`,
+        borderInlineStart: `4px solid ${done ? COLORS.secondary : del > 0 ? COLORS.primary : COLORS.line}`,
       }}>
-        ✅ لا توجد طلبات بانتظار التسليم.
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>
+              {o.customer_name}
+              {!done && del > 0 && (
+                <span style={{
+                  marginInlineStart: 8, fontSize: 10.5, fontWeight: 800,
+                  background: "rgba(181,101,29,.15)", color: COLORS.primary,
+                  borderRadius: 20, padding: "2px 9px",
+                }}>جزئي</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 3 }}>
+              {done
+                ? <>سُلّم كاملاً · {fmt(del)} علبة</>
+                : <>مطلوب {fmt(req)} · <b style={{ color: COLORS.alert }}>متبقٍ {fmt(rem)}</b></>}
+              {o.order_date ? ` · ${o.order_date}` : ""}
+            </div>
+            {!done && del > 0 && (
+              <div style={{ height: 4, background: COLORS.line, borderRadius: 2, marginTop: 7, overflow: "hidden" }}>
+                <div style={{ width: `${pct}%`, height: "100%", background: COLORS.secondary }} />
+              </div>
+            )}
+          </div>
+          <span style={{ color: COLORS.inkSoft, fontSize: 16 }}>‹</span>
+        </div>
       </div>
     );
-  }
+  };
 
   return (
     <div style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: 14, marginBottom: 18 }}>
-      <SectionTitle title="التسليم" subtitle={`${openOrders.length} طلب بانتظار التسليم`} />
+      <SectionTitle title="التسليم"
+        subtitle={openOrders.length ? `${openOrders.length} طلب بانتظار التسليم — اضغط على العميل للتفاصيل` : "لا توجد طلبات بانتظار التسليم"} />
 
-      <div style={{ display: "grid", gap: 9 }}>
-        {openOrders.map((o) => {
-          const rem = num(o.remaining);
-          const done = num(o.delivered);
-          const req = num(o.qty_requested);
-          const pct = req > 0 ? Math.round((done / req) * 100) : 0;
-          return (
-            <div key={o.id} style={{
-              background: COLORS.bg, borderRadius: 12, padding: "11px 13px",
-              border: `1px solid ${COLORS.line}`, borderInlineStart: `4px solid ${done > 0 ? COLORS.primary : COLORS.line}`,
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
-                <div style={{ flex: "1 1 150px" }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{o.customer_name}</div>
-                  <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>
-                    طلب {fmt(req)} · سُلّم {fmt(done)} · <b style={{ color: COLORS.alert }}>متبقٍ {fmt(rem)}</b>
-                    {o.order_date ? ` · ${o.order_date}` : ""}
-                  </div>
-                  {/* شريط التقدم */}
-                  <div style={{ height: 5, background: COLORS.line, borderRadius: 3, marginTop: 7, overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", background: COLORS.secondary, borderRadius: 3 }} />
-                  </div>
-                </div>
+      {openOrders.length > 0 ? (
+        <div style={{ display: "grid", gap: 9 }}>
+          {openOrders.map((o) => <Card key={o.id} o={o} />)}
+        </div>
+      ) : (
+        <div style={{ padding: "18px 12px", textAlign: "center", color: COLORS.inkSoft, fontSize: 13.5 }}>
+          ✅ كل الطلبات مُسلّمة.
+        </div>
+      )}
 
-                <div style={{ display: "grid", gap: 7, flex: "0 0 auto" }}>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                    <input type="number" min="1" max={rem}
-                      value={partial[o.id] ?? ""}
-                      onChange={(e) => setPartial((p) => ({ ...p, [o.id]: e.target.value }))}
-                      placeholder={`${rem}`}
-                      title="الكمية"
-                      style={{ ...inputStyle, width: 66, textAlign: "center" }} />
-                    <span style={{ fontSize: 11, color: COLORS.inkSoft }}>×</span>
-                    <input type="number" min="0"
-                      value={price[o.id] ?? boxPrice}
-                      onChange={(e) => setPrice((p) => ({ ...p, [o.id]: e.target.value }))}
-                      title="سعر العلبة"
-                      style={{ ...inputStyle, width: 76, textAlign: "center" }} />
-                    <select value={pay[o.id] || "كاش"}
-                      onChange={(e) => setPay((p) => ({ ...p, [o.id]: e.target.value }))}
-                      style={{ ...inputStyle, width: 108 }}>
-                      {COLLECT_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: COLORS.deep, fontWeight: 700, textAlign: "center" }}>
-                    الإجمالي: {fmt(num(partial[o.id] || rem) * num(price[o.id] ?? boxPrice))} درهم
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      disabled={busy === o.id}
-                      onClick={() => deliver(o, partial[o.id] || rem, true)}
-                      style={{ ...primaryBtnStyle, background: COLORS.secondary, flex: 1, opacity: busy === o.id ? 0.6 : 1 }}>
-                      {busy === o.id ? "…" : "✓ سلّم وحصّل"}
-                    </button>
-                    <button
-                      disabled={busy === o.id}
-                      onClick={() => deliver(o, partial[o.id] || rem, false)}
-                      style={{ ...ghostBtnStyle, opacity: busy === o.id ? 0.6 : 1 }}
-                      title="سُلّم لكن لم يُدفع بعد">
-                      آجل
-                    </button>
-                  </div>
-                </div>
-              </div>
+      {doneOrders.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <button onClick={() => setShowDone((v) => !v)} style={{ ...ghostBtnStyle, padding: "7px 13px", fontSize: 12 }}>
+            {showDone ? "إخفاء" : `الطلبات المكتملة (${doneOrders.length})`}
+          </button>
+          {showDone && (
+            <div style={{ display: "grid", gap: 9, marginTop: 10 }}>
+              {doneOrders.map((o) => <Card key={o.id} o={o} done />)}
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
 
-      <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.9 }}>
-        اترك خانة الكمية فارغة لتسليم المتبقي كاملاً. السعر قابل للتعديل لكل عملية.
-        «سلّم وحصّل» يسجّل التسليم والتحصيل معاً · «آجل» يسجّل التسليم فقط ويبقى المبلغ في الذمم.
-      </div>
+      {selected && (
+        <OrderDetail order={selected} sales={sales} boxPrice={boxPrice}
+          onClose={() => setOpenId(null)} onReload={onReload} showToast={showToast} />
+      )}
     </div>
   );
 }
@@ -1850,14 +2080,14 @@ function MainApp({ session }) {
         {(tab === "dashboard" || tab === "sources") && (
           <ToolsBar range={range} setRange={setRange} onExportBackup={exportBackup} onExportCSV={exportCSV} boxPrice={boxPrice} onChangePrice={changeBoxPrice} />
         )}
-        {tab === "dashboard" && <Dashboard dash={dash} />}
+        {tab === "dashboard" && <Dashboard dash={dash} onReload={loadAll} />}
         {tab === "sources" && <SourceSummary summary={sourceSummary} />}
         {tab === "collect" && (
           <CollectionsPanel sales={filteredRows.sales || []} onReload={loadAll} showToast={showToast} />
         )}
         {tab === "partners" && <Partners partners={data.partners} distribution={partnersDistribution} withdrawals={data.withdrawals} boughtNet={sourceSummary.bought.net} onReload={loadAll} showToast={showToast} />}
         {tab === "orders" && (
-          <DeliveryPanel orders={filteredRows.orders || []} onReload={loadAll} showToast={showToast} boxPrice={boxPrice} />
+          <DeliveryPanel orders={filteredRows.orders || []} sales={filteredRows.sales || []} onReload={loadAll} showToast={showToast} boxPrice={boxPrice} />
         )}
         {tab === "orders" && (
           <AllocationPanel orders={filteredRows.orders || []} available={dash.available} showToast={showToast} />
@@ -1895,12 +2125,31 @@ function SectionTitle({ title, subtitle }) {
   );
 }
 
-function Dashboard({ dash }) {
+function Dashboard({ dash, onReload }) {
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    if (!onReload) return;
+    setRefreshing(true);
+    try { await onReload(); } finally { setRefreshing(false); }
+  };
   return (
     <div>
       <div style={{ background: `linear-gradient(135deg, ${COLORS.deep}, #3A1C0C)`, borderRadius: 16, padding: 22, marginBottom: 24, color: "#F3E9D8" }}>
-        <div style={{ fontSize: 12.5, color: "#D8C4A8" }}>صافي الربح / العائد</div>
-        <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 32, color: dash.netProfit >= 0 ? "#B9D189" : "#E8A79C" }}>{fmt(dash.netProfit)}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 12.5, color: "#D8C4A8" }}>صافي الربح / العائد</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 32, color: dash.netProfit >= 0 ? "#B9D189" : "#E8A79C" }}>{fmt(dash.netProfit)}</div>
+          </div>
+          {onReload && (
+            <button onClick={refresh} disabled={refreshing} style={{
+              padding: "8px 14px", borderRadius: 9, cursor: "pointer", fontSize: 12.5, fontWeight: 700,
+              border: "1px solid rgba(255,255,255,.3)", background: "rgba(255,255,255,.1)", color: "#F3E9D8",
+              opacity: refreshing ? 0.6 : 1, whiteSpace: "nowrap",
+            }}>
+              {refreshing ? "…" : "🔄 تحديث"}
+            </button>
+          )}
+        </div>
       </div>
       <SectionTitle title="حركة العلب" subtitle="المطلوب · المسلّم · المتوفر" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 26 }}>
