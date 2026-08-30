@@ -33,6 +33,57 @@
     .st-img-a { width: 82%; }
     .st-img-b { width: 50%; }
   }
+
+  /* ===== الصفحة الفخمة (داكن + ذهبي) ===== */
+  .lux { background: #1B100A; min-height: 100vh; color: #E3D3BB;
+         background-image: radial-gradient(ellipse at 50% 0%, rgba(200,155,60,.10), transparent 60%); }
+  .lux-wrap { max-width: 980px; margin: 0 auto; padding: 54px 18px; }
+  .lux-title { text-align: center; margin-bottom: 34px; }
+
+  .lux-hero { position: relative; min-height: 78vh; display: flex; align-items: flex-end; overflow: hidden; }
+  .lux-hero > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .lux-hero-veil { position: absolute; inset: 0;
+    background: linear-gradient(to top, #1B100A 4%, rgba(27,16,10,.72) 40%, rgba(27,16,10,.35) 100%); }
+  .lux-hero-in { position: relative; width: 100%; max-width: 980px; margin: 0 auto; padding: 0 20px 46px; }
+
+  .lux-cta { display: inline-block; text-decoration: none; padding: 13px 32px; border-radius: 10px;
+    font-family: Cairo, sans-serif; font-weight: 800; font-size: 14px; color: #2B1B12;
+    background: linear-gradient(180deg, #E8C77A, #C89B3C);
+    box-shadow: 0 10px 26px rgba(200,155,60,.28); }
+  .lux-cta.big { padding: 16px 48px; font-size: 16px; }
+  .lux-cta.ghost { background: transparent; color: #E8C77A; border: 1px solid rgba(200,155,60,.55);
+    box-shadow: none; }
+
+  .lux-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;
+    padding: 22px 16px; border-top: 1px solid rgba(200,155,60,.2);
+    border-bottom: 1px solid rgba(200,155,60,.2); background: rgba(0,0,0,.22); }
+
+  .lux-quote { max-width: 660px; margin: 0 auto; padding: 48px 22px; text-align: center; }
+
+  .lux-stage { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: center;
+    padding: 26px 0; border-bottom: 1px solid rgba(200,155,60,.14); }
+  .lux-stage:last-child { border-bottom: none; }
+  .lux-copy { order: 1; }
+
+  .lux-grid { display: grid; gap: 8px; order: 2; }
+  .lux-grid.wide { grid-template-columns: 1fr 1fr; }
+  .lux-grid.quad { grid-template-columns: 1fr 1fr; }
+  .lux-grid img { width: 100%; height: 100%; object-fit: cover; display: block;
+    aspect-ratio: 1/1; border-radius: 12px; border: 1px solid rgba(200,155,60,.28);
+    box-shadow: 0 12px 30px rgba(0,0,0,.42); }
+
+  .lux-card { background: rgba(255,255,255,.04); border: 1px solid rgba(200,155,60,.3);
+    border-radius: 14px; padding: 18px 12px; text-align: center; }
+
+  .lux-order { text-align: center; max-width: 560px; margin: 0 auto; padding: 56px 22px; }
+  .lux-foot { text-align: center; padding: 30px 20px 40px; border-top: 1px solid rgba(200,155,60,.18); }
+
+  @media (min-width: 780px) {
+    .lux-stage { grid-template-columns: 0.85fr 1.15fr; gap: 38px; padding: 44px 0; }
+    .lux-stage:nth-child(even) .lux-copy { order: 2; }
+    .lux-stage:nth-child(even) .lux-grid { order: 1; }
+    .lux-hero-in { padding-bottom: 64px; }
+  }
 </style>
 </head>
 <body>
@@ -603,7 +654,9 @@ function CustomerOrderForm() {
         </div>
         <div style={{ position: "relative", marginBottom: 20 }}>
           <div style={{ borderRadius: 18, overflow: "hidden", border: `1.5px solid ${GOLD}`, boxShadow: "0 12px 30px rgba(74,37,17,.28)" }}>
-            <img src="pour.jpeg" alt="دبس التمر" style={{ width: "100%", height: 235, objectFit: "cover", objectPosition: "center 38%", display: "block" }} />
+            <img src={PHOTOS.drip} alt="دبس التمر"
+              onError={(e) => { e.currentTarget.src = "pour.jpeg"; }}
+              style={{ width: "100%", height: 235, objectFit: "cover", objectPosition: "center 45%", display: "block" }} />
             <div style={{ position: "absolute", inset: 0, borderRadius: 18, background: "linear-gradient(to top, rgba(43,27,18,.9) 3%, rgba(43,27,18,.08) 45%, rgba(43,27,18,.3) 100%)" }} />
             <div style={{ position: "absolute", bottom: 15, insetInlineStart: 17, insetInlineEnd: 17 }}>
               <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 900, fontSize: 21, color: GOLD_LIGHT, lineHeight: 1.3, textShadow: "0 2px 8px rgba(0,0,0,.6)" }}>
@@ -620,6 +673,19 @@ function CustomerOrderForm() {
         </div>
 
         <FeatureRow />
+
+        {/* شريط صور مصغّرة */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 7, marginTop: 14 }}>
+          {[PHOTOS.pourA, PHOTOS.anwatA, PHOTOS.bucket].map((src) => (
+            <img key={src} src={src} alt="" loading="lazy"
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+              style={{
+                width: "100%", aspectRatio: "1/1", objectFit: "cover", display: "block",
+                borderRadius: 10, border: `1px solid ${GOLD}`,
+              }} />
+          ))}
+        </div>
+
         <Divider />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
           <div style={{ ...goldHeading, fontSize: 23, textAlign: "center", width: "100%" }}>تسجيل طلب دبس</div>
@@ -633,7 +699,7 @@ function CustomerOrderForm() {
           fontSize: 12.5, color: COLORS.deep, fontWeight: 700, textAlign: "center",
           border: `1px solid ${GOLD}`,
         }}>
-          🌴 رحلة المنتج — من النخلة للمدبسة ←
+          🌴 رحلة المنتج — من النخلة إلى المدبسة ←
         </a>
 
         {status === "done" ? (
@@ -760,11 +826,32 @@ function CustomerOrderForm() {
             </div>
 
             {status === "error" && <div style={{ color: COLORS.alert, fontSize: 12.5, marginTop: 10 }}>{errMsg || "حدث خطأ، حاول مرة أخرى."}</div>}
-            <button type="submit" disabled={status === "saving"} style={{ ...primaryBtnStyle, width: "100%", marginTop: 16, padding: "11px 16px" }}>
-              {status === "saving" ? "جارٍ الإرسال…" : "إرسال الطلب"}
+            <button type="submit" disabled={status === "saving"} style={{
+              width: "100%", marginTop: 18, padding: "15px 16px", borderRadius: 11,
+              border: "none", cursor: "pointer",
+              fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 15.5, color: "#2B1B12",
+              background: `linear-gradient(180deg, ${GOLD_LIGHT}, ${GOLD})`,
+              boxShadow: "0 10px 26px rgba(200,155,60,.35)",
+              opacity: status === "saving" ? 0.7 : 1,
+            }}>
+              {status === "saving" ? "جارٍ الإرسال…" : "تأكيد الطلب"}
             </button>
           </form>
         )}
+
+        {/* التذييل */}
+        <div style={{
+          textAlign: "center", marginTop: 22, paddingTop: 16,
+          borderTop: `1px solid rgba(200,155,60,.35)`,
+          fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.9,
+        }}>
+          <a href="#story" style={{ color: COLORS.primary, fontWeight: 700, textDecoration: "none" }}>
+            رحلة المنتج
+          </a>
+          <div style={{ marginTop: 6 }}>
+            جميع الحقوق محفوظة © {BRAND_NAME} {new Date().getFullYear()}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -990,6 +1077,19 @@ function MadbasaIllustration() {
 
 
 /* كل مرحلة: صورتان متداخلتان + نص جانبي */
+/* أسماء ملفات الصور الجديدة — ارفعها للمستودع بهذه الأسماء */
+const PHOTOS = {
+  drip:    "drip.jpeg",      // الأنواط ينزل منها الدبس — الواجهة
+  pourA:   "pour2.jpeg",     // خيط الدبس الكهرماني
+  pourB:   "pour3.jpeg",     // لقطة قريبة للسيلان
+  thick:   "thick.jpeg",     // الدبس الغامق الكثيف
+  anwatA:  "anwat2.jpeg",    // أنواط مرصوصة
+  anwatB:  "anwat3.jpeg",    // أنواط مكدّسة
+  bucket:  "bucket.jpeg",    // علبة التعبئة
+  brand:   "brand.jpeg",     // اللوجو على الخوص
+  poster:  "poster.jpeg",    // البوستر التعريفي
+};
+
 const STORY_STEPS = [
   {
     a: "palm.jpeg", b: "dates.jpeg",
@@ -1020,140 +1120,220 @@ const STORY_STEPS = [
   },
 ];
 
+/* أيقونات المراحل — خطية ذهبية */
+function StageIcon({ kind, size = 40 }) {
+  const s = { width: size, height: size, fill: "none", stroke: GOLD_LIGHT, strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
+  if (kind === "harvest") return (
+    <svg viewBox="0 0 48 48" style={s}>
+      <path d="M24 42V26" />
+      <path d="M24 26C24 26 14 22 8 26c0-8 10-10 16-6" />
+      <path d="M24 26c0 0 10-4 16 0 0-8-10-10-16-6" />
+      <path d="M24 20c0-6 4-10 4-10s4 4 4 10" />
+      <circle cx="16" cy="36" r="2" /><circle cx="32" cy="36" r="2" /><circle cx="24" cy="39" r="2" />
+    </svg>
+  );
+  if (kind === "dry") return (
+    <svg viewBox="0 0 48 48" style={s}>
+      <circle cx="24" cy="14" r="6" />
+      <path d="M24 4v2M24 22v2M14 14h-2M36 14h-2M17 7l-1.5-1.5M31 21l1.5 1.5M31 7l1.5-1.5M17 21l-1.5 1.5" />
+      <path d="M8 32h32l-3 10H11z" />
+      <path d="M12 32v10M20 32v10M28 32v10M36 32v10" />
+    </svg>
+  );
+  if (kind === "extract") return (
+    <svg viewBox="0 0 48 48" style={s}>
+      <path d="M18 6h12l-2 12H20z" />
+      <path d="M24 18v10" />
+      <path d="M24 28c-4 0-7 3-7 7s3 7 7 7 7-3 7-7-3-7-7-7z" />
+      <path d="M10 40h4M34 40h4" />
+    </svg>
+  );
+  return (
+    <svg viewBox="0 0 48 48" style={s}>
+      <path d="M8 18l16-8 16 8v20l-16 8-16-8z" />
+      <path d="M8 18l16 8 16-8M24 26v20" />
+      <path d="M18 13l16 8" />
+    </svg>
+  );
+}
+
+/* مراحل الصفحة الفخمة — عنوان عربي/إنجليزي + شبكة صور */
+const LUX_STAGES = [
+  {
+    icon: "harvest", ar: "اليَـداد", en: "Harvesting",
+    sub: "نخلة نخلة، وعذق عذق — بعد اكتمال النضج تماماً",
+    text: "ما فيه آلة تقدر تسويها. يطلع الرجّال النخلة بحبل وخبرة، تحت شمس تحرق، ويقص العذوق وحدة وحدة. صنف واحد أصيل، ما نخلطه بغيره.",
+    layout: "wide", imgs: ["harvest.jpeg", "dates.jpeg"],
+  },
+  {
+    icon: "dry", ar: "المسطاح والأنـواط", en: "Sun-Drying & Packing",
+    sub: "يتروّح على الشمس أياماً كما كانوا يسوون الأولين",
+    text: "نتنقى التمر الزين حبة حبة، والحشف نيمّعه للنفيعة. يُغسل، ويتروّح، ويُعبّى بالأنواط — أكياس مضفورة من سعف النخيل بأيادي الحرفيين.",
+    layout: "quad", imgs: ["mastah.jpeg", "anwat.jpeg", PHOTOS.anwatA, PHOTOS.anwatB],
+  },
+  {
+    icon: "extract", ar: "المدبسة", en: "Honey Extraction",
+    sub: "لا نار ولا ضغط — الشمس والثقل وحدهما",
+    text: "غرفة محكمة الإغلاق، ترتفع حرارتها بأشعة الشمس. تكدّس الأنواط فوق بعض، وثقلها مع الحرارة تسيل قطرات الدبس على مدى الأيام.",
+    layout: "wide", imgs: [PHOTOS.drip, PHOTOS.pourA],
+  },
+  {
+    icon: "pack", ar: "التعبئة", en: "Packaging",
+    sub: "بالمنّ… كما عرفوه",
+    text: "يُجمع من كل مدبسة على حدة، ثم يدخل خزان التعبئة، ويصل إليكم كما خرج من المدبسة تماماً — مكوّن واحد فقط: التمر.",
+    layout: "wide", imgs: [PHOTOS.bucket, PHOTOS.thick],
+  },
+];
+
+function LuxStage({ st, i }) {
+  return (
+    <div className="lux-stage">
+      {/* العمود النصي */}
+      <div className="lux-copy">
+        <StageIcon kind={st.icon} size={42} />
+        <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22, color: "#F3E9D8", marginTop: 10 }}>
+          {st.ar}
+        </div>
+        <div style={{ fontSize: 12.5, color: GOLD, letterSpacing: 1.5, fontWeight: 600, marginTop: 2 }}>
+          {st.en}
+        </div>
+        <div style={{ height: 1, background: `linear-gradient(to left, ${GOLD}, transparent)`, margin: "12px 0" }} />
+        <div style={{ fontSize: 12.5, color: GOLD_LIGHT, lineHeight: 1.9, marginBottom: 8 }}>{st.sub}</div>
+        <p style={{ fontSize: 13.5, color: "#C9B393", lineHeight: 2.05, margin: 0 }}>{st.text}</p>
+        <div style={{ fontFamily: "Cairo, sans-serif", fontSize: 40, fontWeight: 800, color: "rgba(200,155,60,.18)", marginTop: 10, lineHeight: 1 }}>
+          {"0" + (i + 1)}
+        </div>
+      </div>
+
+      {/* شبكة الصور */}
+      <div className={st.layout === "quad" ? "lux-grid quad" : "lux-grid wide"}>
+        {st.imgs.map((src, k) => (
+          <img key={src + k} src={src} alt={st.ar} loading="lazy"
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function StoryPage() {
   return (
-    <div dir="rtl" style={{ background: COLORS.bg, minHeight: "100vh", color: COLORS.ink }}>
+    <div dir="rtl" className="lux">
 
-      {/* ===== واجهة مختصرة ===== */}
-      <div style={{ position: "relative", minHeight: "52vh", overflow: "hidden", display: "flex", alignItems: "flex-end" }}>
-        <img src="pour.jpeg" alt="دبس تمر طبيعي"
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(43,27,18,.95) 10%, rgba(43,27,18,.4) 60%, rgba(43,27,18,.2) 100%)" }} />
-        <div style={{ position: "relative", padding: "0 22px 38px", width: "100%", maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ marginBottom: 18 }}><LogoLockup size={50} light /></div>
-          <h1 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 32, lineHeight: 1.3, color: "#FBF6EC", margin: "0 0 12px" }}>
-            الدبس الكهرماني<br />مستخلص بطرق أسلافنا
+      {/* ===== الواجهة ===== */}
+      <div className="lux-hero">
+        <img src={PHOTOS.drip} alt="الدبس ينزل من الأنواط"
+          onError={(e) => { e.currentTarget.src = "pour.jpeg"; }} />
+        <div className="lux-hero-veil" />
+        <div className="lux-hero-in">
+          <div style={{ marginBottom: 16 }}><LogoLockup size={52} light /></div>
+          <h1 style={{
+            fontFamily: "Cairo, sans-serif", fontWeight: 900, fontSize: 30, lineHeight: 1.45,
+            margin: "0 0 14px",
+            background: `linear-gradient(180deg, #FBF0DA 0%, ${GOLD_LIGHT} 55%, #A87C28 100%)`,
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+          }}>
+            قطرات من ذهب التراث
           </h1>
-          <p style={{ fontSize: 14.5, color: "#E3D3BB", lineHeight: 1.95, margin: 0, maxWidth: 480 }}>
-            من نخيل المزرعة، بموسم واحد في السنة.
+          <p style={{ fontSize: 14, color: "#E3D3BB", lineHeight: 2, margin: 0, maxWidth: 460 }}>
+            دبس تمر طبيعي ١٠٠٪ — من نخيل المزرعة، بموسم واحد في السنة.
           </p>
-        </div>
-      </div>
-
-      {/* ===== الإرث ===== */}
-      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "38px 20px" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
-          <div style={{ fontSize: 30, marginBottom: 16 }}>🌴</div>
-          <p style={{ fontSize: 15.5, lineHeight: 2.3, margin: "0 0 22px", color: "#E3D3BB" }}>
-            قبل الكهرباء، وقبل المصانع، عرف أهلنا أن الشمس تكفي.
-            كانوا يطلعون النخلة بحبل، ويفرشون التمر على المسطاح، وينتظرون…
-            لأنهم يعرفون أن الطيب ما يجي بالاستعجال.
-          </p>
-          <p style={{ fontSize: 15.5, lineHeight: 2.3, margin: 0, color: "#E3D3BB" }}>
-            ورثنا الطريقة كما هي، وما غيّرنا فيها حرف —
-            <br />
-            <b style={{ color: "#FBF6EC" }}>غيّرنا الأدوات فقط، حفاظاً على النظافة والدقة.</b>
-          </p>
-          <div style={{ height: 1, background: "rgba(243,233,216,.22)", margin: "26px auto", maxWidth: 180 }} />
-          <div style={{ fontSize: 13, color: "#C9B393", lineHeight: 2 }}>
-            كل علبة تمر عليها: عام من العناية · شهور من الشمس · وأيادٍ لا تعرف الاختصار
+          <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
+            <a href="#order" className="lux-cta">اطلب الآن</a>
+            <a href="#stages" className="lux-cta ghost">رحلة المنتج</a>
           </div>
         </div>
       </div>
 
-      {/* ===== المراحل ===== */}
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 20px 20px" }}>
-        {STORY_STEPS.map((s, i) => (
-          <React.Fragment key={s.a}>
-            {i === 3 && (
-              <div style={{ margin: "0 0 60px" }}>
-                <MadbasaIllustration />
-                <div style={{ textAlign: "center", fontSize: 12.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.9 }}>
-                  الشمس ترفع حرارة الغرفة · ثقل الأنواط يعصر التمر بنفسه · الدبس ينزل قطرة قطرة
-                </div>
-              </div>
-            )}
-            <div className={"st-row" + (i % 2 ? " rev" : "")}>
-            <div className="st-media">
-              <div className="st-stack">
-                <img className="st-img-a" src={s.a} alt={s.title} loading="lazy" />
-                <img className="st-img-b" src={s.b} alt={s.title} loading="lazy" />
-              </div>
-            </div>
-            <div>
-              <div className="st-num">{"0" + (i + 1)}</div>
-              <div style={{ fontSize: 11.5, color: COLORS.primary, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>
-                {s.kicker}
-              </div>
-              <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 25, color: COLORS.deep, margin: "0 0 12px", lineHeight: 1.35 }}>
-                {s.title}
-              </h2>
-              <p style={{ fontSize: 14.5, lineHeight: 2.1, color: COLORS.inkSoft, margin: 0 }}>{s.text}</p>
-              {s.note && (
-                <div style={{
-                  display: "inline-block", marginTop: 16, background: COLORS.amberLight,
-                  color: COLORS.deep, borderRadius: 20, padding: "7px 16px",
-                  fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
-                }}>
-                  {s.note}
-                </div>
-              )}
-            </div>
+      {/* ===== شريط المزايا ===== */}
+      <div className="lux-strip">
+        {[
+          { t: "طبيعي ١٠٠٪", s: "مكوّن واحد: التمر" },
+          { t: "بدون مواد حافظة", s: "ولا سكر مضاف" },
+          { t: "بطرق الأولين", s: "شمس وثقل فقط" },
+        ].map((f) => (
+          <div key={f.t}>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 14, color: GOLD_LIGHT }}>{f.t}</div>
+            <div style={{ fontSize: 11.5, color: "#A8927A", marginTop: 4 }}>{f.s}</div>
           </div>
-          </React.Fragment>
         ))}
       </div>
 
-      {/* ===== التعبئة ===== */}
-      <div style={{ background: COLORS.amberLight, padding: "46px 20px" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <div className="st-row">
-            <div className="st-media">
-              <img src="filling.jpeg" alt="تعبئة الدبس" loading="lazy"
-                style={{ width: "100%", borderRadius: 18, boxShadow: "0 18px 40px rgba(74,37,17,.22)", objectFit: "cover", aspectRatio: "4/3" }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11.5, color: COLORS.primary, fontWeight: 800, letterSpacing: 2, marginBottom: 4 }}>التعبئة</div>
-              <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 25, color: COLORS.deep, margin: "0 0 12px" }}>
-                بالمنّ… كما عرفوه
-              </h2>
-              <p style={{ fontSize: 14.5, lineHeight: 2.1, color: COLORS.inkSoft, margin: "0 0 18px" }}>
-                يُعبّأ بالمقاييس المتوارثة في المنطقة، ويصل إليكم كما خرج من المدبسة تماماً.
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {[{ n: "المنّ", kg: BOX_SIZE_KG, price: DEFAULT_BOX_PRICE }, { n: "المنّين", kg: BOX_SIZE_KG * 2, price: DEFAULT_BOX_PRICE * 2 }].map((m) => (
-                  <div key={m.n} style={{ background: "#fff", border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: "16px 12px", textAlign: "center" }}>
-                    <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19, color: COLORS.deep }}>{m.n}</div>
-                    <div style={{ fontSize: 12, color: COLORS.inkSoft, margin: "4px 0 8px" }}>{m.kg} كيلو</div>
-                    <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16, color: COLORS.primary }}>{m.price} درهم</div>
-                  </div>
-                ))}
+      {/* ===== الإرث ===== */}
+      <div className="lux-quote">
+        <div style={{ fontSize: 26, color: GOLD, marginBottom: 14 }}>🌴</div>
+        <p style={{ fontSize: 15, lineHeight: 2.35, margin: "0 0 18px", color: "#E3D3BB" }}>
+          قبل الكهرباء، وقبل المصانع، عرف أهلنا أن الشمس تكفي.
+          كانوا يطلعون النخلة بحبل، ويفرشون التمر على المسطاح، وينتظرون…
+          لأنهم يعرفون أن الطيب ما يجي بالاستعجال.
+        </p>
+        <p style={{ fontSize: 15, lineHeight: 2.35, margin: 0, color: "#E3D3BB" }}>
+          ورثنا الطريقة كما هي، وما غيّرنا فيها حرف —
+          <br /><b style={{ color: "#FBF6EC" }}>غيّرنا الأدوات فقط، حفاظاً على النظافة والدقة.</b>
+        </p>
+      </div>
+
+      {/* ===== المراحل ===== */}
+      <div id="stages" className="lux-wrap">
+        <div className="lux-title">
+          <div style={{ fontSize: 11.5, color: GOLD, fontWeight: 800, letterSpacing: 3 }}>THE JOURNEY</div>
+          <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 25, color: "#F3E9D8", margin: "8px 0 0" }}>
+            رحلة صناعة الدبس
+          </h2>
+        </div>
+        {LUX_STAGES.map((st, i) => <LuxStage key={st.ar} st={st} i={i} />)}
+      </div>
+
+      {/* ===== المدبسة: الرسم التوضيحي ===== */}
+      <div className="lux-wrap" style={{ paddingTop: 0 }}>
+        <div style={{ border: `1px solid rgba(200,155,60,.28)`, borderRadius: 18, overflow: "hidden" }}>
+          <MadbasaIllustration />
+        </div>
+        <div style={{ textAlign: "center", fontSize: 12, color: "#A8927A", marginTop: 12, lineHeight: 1.9 }}>
+          الشمس ترفع حرارة الغرفة · ثقل الأنواط يعصر التمر بنفسه · الدبس ينزل قطرة قطرة
+        </div>
+      </div>
+
+      {/* ===== المقاسات ===== */}
+      <div className="lux-wrap">
+        <div className="lux-title">
+          <div style={{ fontSize: 11.5, color: GOLD, fontWeight: 800, letterSpacing: 3 }}>SIZES</div>
+          <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 25, color: "#F3E9D8", margin: "8px 0 0" }}>
+            بالمنّ… كما عرفوه
+          </h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, maxWidth: 460, margin: "0 auto" }}>
+          {[{ n: "المنّ", kg: BOX_SIZE_KG, price: DEFAULT_BOX_PRICE }, { n: "المنّين", kg: BOX_SIZE_KG * 2, price: DEFAULT_BOX_PRICE * 2 }].map((m) => (
+            <div key={m.n} className="lux-card">
+              <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 20, color: "#F3E9D8" }}>{m.n}</div>
+              <div style={{ fontSize: 12, color: "#A8927A", margin: "5px 0 10px" }}>{m.kg} كيلو</div>
+              <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 18, color: GOLD_LIGHT }}>
+                {m.price} <span style={{ fontSize: 12 }}>درهم</span>
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
       {/* ===== الطلب ===== */}
-      <div style={{ background: COLORS.deep, color: "#F3E9D8", padding: "56px 20px" }}>
-        <div style={{ maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
-          <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 26, margin: "0 0 12px", lineHeight: 1.5 }}>
-            موسم واحد في السنة
-          </h2>
-          <p style={{ fontSize: 14.5, lineHeight: 2.1, color: "#E3D3BB", margin: "0 0 28px" }}>
-            الكمية محدودة بما تعطيه النخلة — احجز نصيبك قبل نفادها.
-          </p>
-          <a href="#order" style={{
-            display: "inline-block", textDecoration: "none", padding: "16px 52px",
-            fontSize: 16, fontWeight: 800, borderRadius: 12,
-            background: COLORS.primary, color: "#fff",
-            fontFamily: "Cairo, sans-serif",
-          }}>
-            اطلب الآن
-          </a>
-          <div style={{ fontSize: 12.5, color: "#C9B393", marginTop: 16 }}>
-            الدفع عند الاستلام · توصيل لجميع الإمارات
-          </div>
+      <div className="lux-order">
+        <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 26, margin: "0 0 12px", color: "#F3E9D8", lineHeight: 1.5 }}>
+          موسم واحد في السنة
+        </h2>
+        <p style={{ fontSize: 14, lineHeight: 2.1, color: "#C9B393", margin: "0 0 26px" }}>
+          الكمية محدودة بما تعطيه النخلة — احجز نصيبك قبل نفادها.
+        </p>
+        <a href="#order" className="lux-cta big">اطلب نوطك الخاص</a>
+        <div style={{ fontSize: 12, color: "#A8927A", marginTop: 16 }}>
+          الدفع عند الاستلام · توصيل لجميع الإمارات
+        </div>
+      </div>
+
+      {/* ===== التذييل ===== */}
+      <div className="lux-foot">
+        <LogoLockup size={40} light center />
+        <div style={{ fontSize: 11.5, color: "#8A7358", marginTop: 14 }}>
+          جميع الحقوق محفوظة © {BRAND_NAME} {new Date().getFullYear()}
         </div>
       </div>
     </div>
