@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>أنواط — دبس تمر طبيعي ١٠٠٪</title>
-<link rel="icon" href="icon.jpeg" />
-<link rel="apple-touch-icon" href="icon.jpeg" />
+<title>أنواط — دبس التمر الطبيعي ١٠٠٪</title>
+<link rel="icon" type="image/png" href="anwat-icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="theme-color" content="#241609" />
-<meta name="description" content="أنواط — دبس تمر إماراتي طبيعي 100%، مستخلص بالطريقة التراثية في المدبسة. موسم واحد في السنة، بكمية محدودة." />
+<meta name="description" content="أنواط — دبس التمر الإماراتي الطبيعي 100%، مستخلص بالطريقة التراثية في المدبسة. موسم واحد في السنة، بكمية محدودة." />
 <meta name="author" content="أنواط ANWAT" />
 <link rel="canonical" href="https://dates-dibs-ae.netlify.app/" />
 
@@ -15,7 +15,7 @@
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="أنواط" />
 <meta property="og:title" content="أنواط — من المدبسة… قطرات من الكهرمان" />
-<meta property="og:description" content="دبس تمر إماراتي طبيعي 100%، بلا سكر ولا مواد حافظة. موسم واحد في السنة." />
+<meta property="og:description" content="دبس التمر الإماراتي الطبيعي 100%، بلا سكر ولا مواد حافظة. موسم واحد في السنة." />
 <meta property="og:image" content="drip.jpeg" />
 <meta property="og:locale" content="ar_AE" />
 <meta name="twitter:card" content="summary_large_image" />
@@ -53,15 +53,22 @@
 
   /* ===== الصفحة الفخمة (داكن + ذهبي) ===== */
   .lux { background: #1B100A; min-height: 100vh; color: #E3D3BB;
-         background-image: radial-gradient(ellipse at 50% 0%, rgba(200,155,60,.10), transparent 60%); }
+         background-image:
+           radial-gradient(ellipse at 50% 0%, rgba(200,155,60,.10), transparent 60%),
+           url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%3E%3Cg%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.05%22%3E%3Cpath%20d%3D%22M30%208%20L38%2018%20L30%2028%20L22%2018%20Z%22%2F%3E%3Cpath%20d%3D%22M0%2038%20L8%2048%20L0%2058%20L-8%2048%20Z%22%2F%3E%3Cpath%20d%3D%22M60%2038%20L68%2048%20L60%2058%20L52%2048%20Z%22%2F%3E%3Cpath%20d%3D%22M15%2045%20L19%2050%20L15%2055%20L11%2050%20Z%22%2F%3E%3Cpath%20d%3D%22M45%2045%20L49%2050%20L45%2055%20L41%2050%20Z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+         background-repeat: no-repeat, repeat; }
   .lux-wrap { max-width: 980px; margin: 0 auto; padding: 54px 18px; }
   .lux-title { text-align: center; margin-bottom: 34px; }
 
   .lux-hero { position: relative; min-height: 78vh; display: flex; align-items: flex-end; overflow: hidden; }
   .lux-hero > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .lux-hero-veil { position: absolute; inset: 0;
-    background: linear-gradient(to top, #1B100A 4%, rgba(27,16,10,.72) 40%, rgba(27,16,10,.35) 100%); }
-  .lux-hero-in { position: relative; width: 100%; max-width: 980px; margin: 0 auto; padding: 0 20px 46px; }
+    background: linear-gradient(to top,
+      #1B100A 0%, #1B100A 18%,
+      rgba(27,16,10,.94) 34%,
+      rgba(27,16,10,.70) 55%,
+      rgba(27,16,10,.28) 100%); }
+  .lux-hero-in { position: relative; width: 100%; max-width: 980px; margin: 0 auto; padding: 0 20px 54px; }
 
   .lux-cta { display: inline-block; text-decoration: none; padding: 13px 32px; border-radius: 10px;
     font-family: Cairo, sans-serif; font-weight: 800; font-size: 14px; color: #2B1B12;
@@ -94,6 +101,21 @@
 
   .lux-order { text-align: center; max-width: 560px; margin: 0 auto; padding: 56px 22px; }
   .lux-foot { text-align: center; padding: 30px 20px 40px; border-top: 1px solid rgba(200,155,60,.18); }
+
+
+  /* ===== طبقة السدو الملوّنة ===== */
+  .sadu-layer { position: absolute; inset: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2280%22%20height%3D%22160%22%20viewBox%3D%220%200%2080%20160%22%3E%3Crect%20width%3D%2280%22%20height%3D%22160%22%20fill%3D%22%232A1608%22%2F%3E%3Cg%20fill%3D%22%236E2018%22%20fill-opacity%3D%220.9%22%3E%3Cpath%20d%3D%22M0%2010%20L10%200%20L20%2010%20L10%2020%20Z%20M20%2010%20L30%200%20L40%2010%20L30%2020%20Z%20M40%2010%20L50%200%20L60%2010%20L50%2020%20Z%20M60%2010%20L70%200%20L80%2010%20L70%2020%20Z%22%2F%3E%3C%2Fg%3E%3Crect%20y%3D%2222%22%20width%3D%2280%22%20height%3D%222%22%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.8%22%2F%3E%3Cg%20fill%3D%22%2322315C%22%20fill-opacity%3D%220.9%22%3E%3Cpath%20d%3D%22M5%2030%20L15%2030%20L10%2040%20Z%20M25%2030%20L35%2030%20L30%2040%20Z%20M45%2030%20L55%2030%20L50%2040%20Z%20M65%2030%20L75%2030%20L70%2040%20Z%22%2F%3E%3Cpath%20d%3D%22M15%2044%20L25%2044%20L20%2054%20Z%20M35%2044%20L45%2044%20L40%2054%20Z%20M55%2044%20L65%2044%20L60%2054%20Z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.6%22%3E%3Cpath%20d%3D%22M10%2062%20L18%2070%20L10%2078%20L2%2070%20Z%20M30%2062%20L38%2070%20L30%2078%20L22%2070%20Z%20M50%2062%20L58%2070%20L50%2078%20L42%2070%20Z%20M70%2062%20L78%2070%20L70%2078%20L62%2070%20Z%22%2F%3E%3C%2Fg%3E%3Crect%20y%3D%2282%22%20width%3D%2280%22%20height%3D%222%22%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.8%22%2F%3E%3Cg%20fill%3D%22%23E8C77A%22%20fill-opacity%3D%220.35%22%3E%3Cpath%20d%3D%22M0%2092%20h6%20v6%20h-6%20Z%20M14%2092%20h6%20v6%20h-6%20Z%20M28%2092%20h6%20v6%20h-6%20Z%20M42%2092%20h6%20v6%20h-6%20Z%20M56%2092%20h6%20v6%20h-6%20Z%20M70%2092%20h6%20v6%20h-6%20Z%22%2F%3E%3Cpath%20d%3D%22M7%20102%20h6%20v6%20h-6%20Z%20M21%20102%20h6%20v6%20h-6%20Z%20M35%20102%20h6%20v6%20h-6%20Z%20M49%20102%20h6%20v6%20h-6%20Z%20M63%20102%20h6%20v6%20h-6%20Z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%236E2018%22%20fill-opacity%3D%220.8%22%3E%3Cpath%20d%3D%22M0%20130%20L10%20120%20L20%20130%20L10%20140%20Z%20M20%20130%20L30%20120%20L40%20130%20L30%20140%20Z%20M40%20130%20L50%20120%20L60%20130%20L50%20140%20Z%20M60%20130%20L70%20120%20L80%20130%20L70%20140%20Z%22%2F%3E%3C%2Fg%3E%3Crect%20y%3D%22146%22%20width%3D%2280%22%20height%3D%222%22%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.7%22%2F%3E%3C%2Fsvg%3E");
+    background-size: 200px auto; background-repeat: repeat;
+    opacity: .30;
+    -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,.85) 30%, transparent 72%);
+            mask-image: linear-gradient(to top, #000 0%, rgba(0,0,0,.85) 30%, transparent 72%); }
+
+  .lux-order > *:not(.sadu-soft) { position: relative; z-index: 1; }
+  .sadu-soft { position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2280%22%20height%3D%22160%22%20viewBox%3D%220%200%2080%20160%22%3E%3Crect%20width%3D%2280%22%20height%3D%22160%22%20fill%3D%22%232A1608%22%2F%3E%3Cg%20fill%3D%22%236E2018%22%20fill-opacity%3D%220.9%22%3E%3Cpath%20d%3D%22M0%2010%20L10%200%20L20%2010%20L10%2020%20Z%20M20%2010%20L30%200%20L40%2010%20L30%2020%20Z%20M40%2010%20L50%200%20L60%2010%20L50%2020%20Z%20M60%2010%20L70%200%20L80%2010%20L70%2020%20Z%22%2F%3E%3C%2Fg%3E%3Crect%20y%3D%2222%22%20width%3D%2280%22%20height%3D%222%22%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.8%22%2F%3E%3Cg%20fill%3D%22%2322315C%22%20fill-opacity%3D%220.9%22%3E%3Cpath%20d%3D%22M5%2030%20L15%2030%20L10%2040%20Z%20M25%2030%20L35%2030%20L30%2040%20Z%20M45%2030%20L55%2030%20L50%2040%20Z%20M65%2030%20L75%2030%20L70%2040%20Z%22%2F%3E%3Cpath%20d%3D%22M15%2044%20L25%2044%20L20%2054%20Z%20M35%2044%20L45%2044%20L40%2054%20Z%20M55%2044%20L65%2044%20L60%2054%20Z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.6%22%3E%3Cpath%20d%3D%22M10%2062%20L18%2070%20L10%2078%20L2%2070%20Z%20M30%2062%20L38%2070%20L30%2078%20L22%2070%20Z%20M50%2062%20L58%2070%20L50%2078%20L42%2070%20Z%20M70%2062%20L78%2070%20L70%2078%20L62%2070%20Z%22%2F%3E%3C%2Fg%3E%3Crect%20y%3D%2282%22%20width%3D%2280%22%20height%3D%222%22%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.8%22%2F%3E%3Cg%20fill%3D%22%23E8C77A%22%20fill-opacity%3D%220.35%22%3E%3Cpath%20d%3D%22M0%2092%20h6%20v6%20h-6%20Z%20M14%2092%20h6%20v6%20h-6%20Z%20M28%2092%20h6%20v6%20h-6%20Z%20M42%2092%20h6%20v6%20h-6%20Z%20M56%2092%20h6%20v6%20h-6%20Z%20M70%2092%20h6%20v6%20h-6%20Z%22%2F%3E%3Cpath%20d%3D%22M7%20102%20h6%20v6%20h-6%20Z%20M21%20102%20h6%20v6%20h-6%20Z%20M35%20102%20h6%20v6%20h-6%20Z%20M49%20102%20h6%20v6%20h-6%20Z%20M63%20102%20h6%20v6%20h-6%20Z%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%236E2018%22%20fill-opacity%3D%220.8%22%3E%3Cpath%20d%3D%22M0%20130%20L10%20120%20L20%20130%20L10%20140%20Z%20M20%20130%20L30%20120%20L40%20130%20L30%20140%20Z%20M40%20130%20L50%20120%20L60%20130%20L50%20140%20Z%20M60%20130%20L70%20120%20L80%20130%20L70%20140%20Z%22%2F%3E%3C%2Fg%3E%3Crect%20y%3D%22146%22%20width%3D%2280%22%20height%3D%222%22%20fill%3D%22%23C89B3C%22%20fill-opacity%3D%220.7%22%2F%3E%3C%2Fsvg%3E");
+    background-size: 190px auto; background-repeat: repeat;
+    opacity: .16; }
 
   /* الشريط السفلي الثابت — جوال فقط */
   .lux-sticky { display: none; position: fixed; bottom: 0; inset-inline: 0; z-index: 40;
@@ -161,7 +183,7 @@ const dangerBtnStyle = { padding: "6px 10px", borderRadius: 8, border: "none", b
 
 const BRAND_NAME = "أنواط";
 const BRAND_LATIN = "ANWAT";
-const BRAND_DESC = "دبس تمر طبيعي ١٠٠٪";
+const BRAND_DESC = "دبس التمر الطبيعي ١٠٠٪";
 const BRAND_TAGLINE = "من المدبسة… قطرات من الكهرمان";
 let DEFAULT_BOX_PRICE = 150;   // يُحمّل من الإعدادات عند بدء التطبيق
 const BOX_SIZE_KG = 4;
@@ -468,14 +490,16 @@ function AnwatMark({ size = 56, light = false }) {
 function LogoMark({ size = 56, light = false }) {
   const [failed, setFailed] = useState(false);
   if (failed) return <AnwatMark size={size} light={light} />;
+  /* العلامة شفافة الخلفية — تُعرض بلا إطار ولا صندوق */
   return (
-    <img src="icon.jpeg" alt={BRAND_NAME}
+    <img src="anwat-mark.png" alt={BRAND_NAME}
       onError={() => setFailed(true)}
       style={{
-        width: size, height: size, borderRadius: size * 0.24,
-        objectFit: "cover", display: "block",
-        border: light ? "1px solid rgba(243,233,216,.35)" : `1px solid ${COLORS.line}`,
-        boxShadow: light ? "0 6px 18px rgba(0,0,0,.35)" : "0 4px 12px rgba(74,37,17,.18)",
+        width: size * 1.08, height: size * 1.08,
+        objectFit: "contain", display: "block",
+        filter: light
+          ? "drop-shadow(0 4px 12px rgba(0,0,0,.5))"
+          : "drop-shadow(0 3px 8px rgba(74,37,17,.22))",
       }} />
   );
 }
@@ -626,6 +650,73 @@ function Splash({ text = "جارٍ التحميل…" }) {
         {BRAND_NAME}
       </div>
       <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>{text}</div>
+    </div>
+  );
+}
+
+/* ============ نقش السدو ============ */
+/* شريط زخرفي متكرر مستوحى من نسيج السدو الإماراتي */
+function SaduBand({ height = 26, opacity = 1, flip = false, color = GOLD, accent = GOLD_LIGHT }) {
+  const id = "sadu" + String(color).replace("#", "") + (flip ? "f" : "");
+  return (
+    <div style={{
+      width: "100%", height, opacity, lineHeight: 0,
+      transform: flip ? "scaleY(-1)" : undefined,
+    }} aria-hidden="true">
+      <svg width="100%" height={height} viewBox={`0 0 120 28`} preserveAspectRatio="none"
+        style={{ display: "block" }}>
+        <defs>
+          <pattern id={id} width="30" height="28" patternUnits="userSpaceOnUse">
+            {/* الخطان العلوي والسفلي */}
+            <path d="M0 3.5 H30 M0 24.5 H30" stroke={color} strokeWidth="1.4" fill="none" />
+            {/* المعين الكبير */}
+            <path d="M10 8 L18 14 L10 20 L2 14 Z" fill={color} />
+            {/* المعين الصغير */}
+            <path d="M25 9.5 L29.5 14 L25 18.5 L20.5 14 Z" fill={accent} />
+            {/* الأسنّة العلوية والسفلية */}
+            <path d="M6 0 L10 3.5 L14 0 Z" fill={color} opacity="0.8" />
+            <path d="M6 28 L10 24.5 L14 28 Z" fill={color} opacity="0.8" />
+          </pattern>
+        </defs>
+        <rect width="120" height="28" fill={`url(#${id})`} />
+      </svg>
+    </div>
+  );
+}
+
+/* ============ شاشة الافتتاح ============ */
+/* تظهر لحظة عند فتح صفحة العميل ثم تتلاشى */
+function IntroScreen({ onDone }) {
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setLeaving(true), 1500);
+    const t2 = setTimeout(onDone, 2250);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [onDone]);
+
+  return (
+    <div
+      onClick={() => { setLeaving(true); setTimeout(onDone, 500); }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200, cursor: "pointer",
+        background: "#241609",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        opacity: leaving ? 0 : 1,
+        transform: leaving ? "scale(1.04)" : "scale(1)",
+        transition: "opacity .7s ease, transform .7s ease",
+      }}>
+      <img src="anwat-splash.jpeg" alt={BRAND_NAME}
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        style={{
+          width: "100%", height: "100%",
+          objectFit: "cover", objectPosition: "center",
+        }} />
+      <div style={{
+        position: "absolute", bottom: 26, insetInline: 0, textAlign: "center",
+        fontSize: 11.5, color: "rgba(232,199,122,.75)", letterSpacing: 1,
+      }}>
+        اضغط للمتابعة
+      </div>
     </div>
   );
 }
@@ -837,6 +928,7 @@ function CustomerOrderForm() {
       <Backdrop />
       <div style={{ position: "fixed", top: 0, insetInline: 0, zIndex: 20 }}>
         <SeasonBar state={season} />
+        <SaduBand height={16} opacity={0.85} />
       </div>
       <div style={{ ...card, marginTop: 26 }}>
         <div style={{ marginBottom: 16 }}>
@@ -1034,9 +1126,11 @@ function CustomerOrderForm() {
         )}
 
         {/* التذييل */}
+        <div style={{ marginTop: 20, opacity: 0.8 }}>
+          <SaduBand height={16} color={COLORS.primary} accent={GOLD} />
+        </div>
         <div style={{
-          textAlign: "center", marginTop: 22, paddingTop: 16,
-          borderTop: `1px solid rgba(200,155,60,.35)`,
+          textAlign: "center", marginTop: 14, paddingTop: 4,
           fontSize: 11, color: COLORS.inkSoft, lineHeight: 1.9,
         }}>
           <a href="#story" style={{ color: COLORS.primary, fontWeight: 700, textDecoration: "none" }}>
@@ -1442,12 +1536,14 @@ function StoryPage() {
   return (
     <div dir="rtl" className="lux">
       <SeasonBar state={season} />
+      <SaduBand height={22} opacity={0.9} />
 
       {/* ===== الواجهة ===== */}
       <div className="lux-hero">
         <img src={PHOTOS.drip} alt="الدبس ينزل من الأنواط" fetchPriority="high" decoding="async"
           onError={(e) => { e.currentTarget.src = "pour.jpeg"; }} />
         <div className="lux-hero-veil" />
+        <div className="sadu-layer" />
         <div className="lux-hero-in">
           <div style={{ marginBottom: 16 }}><LogoLockup size={52} light /></div>
           <h1 style={{
@@ -1455,11 +1551,12 @@ function StoryPage() {
             margin: "0 0 14px",
             background: `linear-gradient(180deg, #FBF0DA 0%, ${GOLD_LIGHT} 55%, #A87C28 100%)`,
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+            filter: "drop-shadow(0 3px 14px rgba(0,0,0,.75))",
           }}>
             قطرات من الكهرمان
           </h1>
           <p style={{ fontSize: 14.5, color: "#E3D3BB", lineHeight: 2.05, margin: 0, maxWidth: 470 }}>
-            دبس إماراتي فاخر، نقي ١٠٠٪، ينساب من ذاكرة النخلة وحكمة الأجداد.
+            دبس التمر الإماراتي الفاخر، نقي ١٠٠٪، ينساب من ذاكرة النخلة وحكمة الأجداد.
           </p>
           <div style={{ display: "flex", gap: 10, marginTop: 22, flexWrap: "wrap" }}>
             <a href="#order" className="lux-cta">اطلب الآن</a>
@@ -1481,6 +1578,8 @@ function StoryPage() {
           </div>
         ))}
       </div>
+
+      <SaduBand height={18} opacity={0.55} />
 
       {/* ===== الإرث ===== */}
       <div className="lux-quote">
@@ -1575,6 +1674,10 @@ function StoryPage() {
           background: "rgba(255,255,255,.03)", padding: "34px 24px",
           maxWidth: 720, margin: "0 auto", textAlign: "center",
         }}>
+          <img src="anwat-drop.png" alt="" aria-hidden="true"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+            style={{ width: 54, display: "block", margin: "0 auto 14px",
+                     filter: "drop-shadow(0 6px 16px rgba(0,0,0,.5))" }} />
           <div style={{ fontSize: 11.5, color: GOLD, fontWeight: 800, letterSpacing: 3, marginBottom: 10 }}>
             THE NAME
           </div>
@@ -1647,7 +1750,8 @@ function StoryPage() {
       </div>
 
       {/* ===== الطلب ===== */}
-      <div className="lux-order">
+      <div className="lux-order" style={{ position: "relative", overflow: "hidden" }}>
+        <div className="sadu-soft" />
         <h2 style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 26, margin: "0 0 12px", color: "#F3E9D8", lineHeight: 1.5 }}>
           موسم واحد في السنة
         </h2>
@@ -1665,6 +1769,8 @@ function StoryPage() {
       <a href="#order" className="lux-sticky">
         {season === "sold" ? "🔒 نفدت الكمية — تابعنا للموسم القادم" : "🌴 احجز نصيبك من الموسم"}
       </a>
+
+      <SaduBand height={20} opacity={0.7} />
 
       {/* ===== شريط الخدمات ===== */}
       <div style={{
@@ -1685,6 +1791,8 @@ function StoryPage() {
           </div>
         ))}
       </div>
+
+      <SaduBand height={18} opacity={0.5} flip />
 
       {/* ===== التذييل ===== */}
       <div className="lux-foot">
@@ -3099,12 +3207,7 @@ function printPartnerStatement(partner, row, withdrawals) {
 
   const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8" />
   <title>كشف حساب — ${partner.name}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="preconnect" href="https://unpkg.com" />
-<link rel="preconnect" href="https://gxngygirhwyhnjvvwsah.supabase.co" />
-<link rel="preload" as="image" href="drip.jpeg" />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;700&display=swap" />
   <style>
     body { font-family: Tajawal, sans-serif; color: #2B1B12; padding: 34px; }
     h1 { font-family: Cairo, sans-serif; font-size: 21px; margin: 0 0 4px; }
@@ -3646,6 +3749,13 @@ function DataTable({ tableKey, config, rows, ordersRows, onReload, showToast }) 
 function Root() {
   const [session, setSession] = useState(undefined);
   const [hash, setHash] = useState(window.location.hash);
+  /* لا تتكرر شاشة الافتتاح داخل الجلسة نفسها */
+  const [introDone, setIntroDone] = useState(() => {
+    try { return sessionStorage.getItem("anwat_intro") === "1"; } catch (e) { return false; }
+  });
+  useEffect(() => {
+    if (introDone) { try { sessionStorage.setItem("anwat_intro", "1"); } catch (e) {} }
+  }, [introDone]);
 
   useEffect(() => {
     const onHash = () => setHash(window.location.hash);
@@ -3662,6 +3772,16 @@ function Root() {
   if (hash.startsWith("#cancel")) {
     const t = (hash.split("=")[1] || "").trim();
     return <CancelOrderPage token={t} />;
+  }
+  /* شاشة الافتتاح تظهر مرة واحدة في الجلسة لصفحات العميل */
+  const isCustomer = hash === "#story" || hash === "#order";
+  if (isCustomer && !introDone) {
+    return (
+      <>
+        {hash === "#story" ? <StoryPage /> : <CustomerOrderForm />}
+        <IntroScreen onDone={() => setIntroDone(true)} />
+      </>
+    );
   }
   if (hash === "#story") return <StoryPage />;
   if (hash === "#order") return <CustomerOrderForm />;
