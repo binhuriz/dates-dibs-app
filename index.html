@@ -6,7 +6,24 @@
 <title>أنواط — دبس تمر طبيعي ١٠٠٪</title>
 <link rel="icon" href="icon.jpeg" />
 <link rel="apple-touch-icon" href="icon.jpeg" />
-<meta name="theme-color" content="#4A2511" />
+<meta name="theme-color" content="#241609" />
+<meta name="description" content="أنواط — دبس تمر إماراتي طبيعي 100%، مستخلص بالطريقة التراثية في المدبسة. موسم واحد في السنة، بكمية محدودة." />
+<meta name="author" content="أنواط ANWAT" />
+<link rel="canonical" href="https://dates-dibs-ae.netlify.app/" />
+
+<!-- بطاقة المشاركة على واتساب وتويتر -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="أنواط" />
+<meta property="og:title" content="أنواط — من المدبسة… قطرات من الكهرمان" />
+<meta property="og:description" content="دبس تمر إماراتي طبيعي 100%، بلا سكر ولا مواد حافظة. موسم واحد في السنة." />
+<meta property="og:image" content="drip.jpeg" />
+<meta property="og:locale" content="ar_AE" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://unpkg.com" />
+<link rel="preconnect" href="https://gxngygirhwyhnjvvwsah.supabase.co" />
+<link rel="preload" as="image" href="drip.jpeg" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" />
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -183,6 +200,8 @@ const TABLES = {
       return { ...row, duration_days: duration, boxes_per_bag: boxesPerBag, total_box_weight: totalBoxWeight };
     },
     display: ["source", "entry_date", "exit_date", "boxes_used", "box_weight", "total_box_weight", "bag_count", "boxes_per_bag", "duration_days", "notes"],
+    labels: { total_box_weight: "إجمالي وزن الصناديق", boxes_per_bag: "صناديق/كيس", duration_days: "المدة (يوم)" },
+    sum: ["boxes_used", "total_box_weight", "bag_count"],
   },
   boxes: {
     label: "إنتاج العلب", icon: "📦", table: "boxes",
@@ -195,6 +214,8 @@ const TABLES = {
     ],
     computed: (row) => ({ ...row, total_dibs: row.box_count && row.box_weight ? num(row.box_count) * num(row.box_weight) : "" }),
     display: ["date", "source", "box_count", "box_weight", "total_dibs", "notes"],
+    labels: { total_dibs: "إجمالي الدبس (كجم)" },
+    sum: ["box_count", "total_dibs"],
   },
   purchases: {
     label: "شراء التمور", icon: "🧺", table: "purchases",
@@ -210,6 +231,8 @@ const TABLES = {
     ],
     computed: (row) => ({ ...row, total: row.qty && row.unit_price ? num(row.qty) * num(row.unit_price) : "" }),
     display: ["date", "supplier", "method", "qty", "unit_price", "total", "weight", "buyer", "notes"],
+    labels: { total: "الإجمالي" },
+    sum: ["qty", "total", "weight"],
   },
   orders: {
     label: "طلبات العملاء", icon: "📋", table: "orders",
@@ -229,6 +252,8 @@ const TABLES = {
       return { ...row, delivered, remaining, status, total_value: req * DEFAULT_BOX_PRICE };
     },
     display: ["order_date", "customer_name", "qty_requested", "total_value", "delivered", "remaining", "status", "notes"],
+    labels: { total_value: "قيمة الطلب", delivered: "المُسلّم", remaining: "المتبقي", status: "الحالة" },
+    sum: ["qty_requested", "total_value", "delivered", "remaining"],
   },
   sales: {
     label: "المبيعات", icon: "💰", table: "sales",
@@ -255,6 +280,8 @@ const TABLES = {
       return { ...row, total, remaining_for_customer: remainingForCustomer };
     },
     display: ["date", "order_id", "source", "customer", "qty", "unit_price", "total", "remaining_for_customer", "payment_method", "notes"],
+    labels: { total: "الإجمالي", remaining_for_customer: "متبقٍ للعميل" },
+    sum: ["qty", "total"],
   },
   nafia: {
     label: "النفيعة", icon: "🌿", table: "nafia",
@@ -268,6 +295,8 @@ const TABLES = {
     ],
     computed: (row) => ({ ...row, total: row.qty_sacks && row.unit_price ? num(row.qty_sacks) * num(row.unit_price) : "" }),
     display: ["date", "source", "qty_sacks", "unit_price", "total", "buyer", "notes"],
+    labels: { total: "الإجمالي" },
+    sum: ["qty_sacks", "total"],
   },
   gifts: {
     label: "العطايا", icon: "🎁", table: "gifts",
@@ -282,6 +311,8 @@ const TABLES = {
     ],
     computed: (row) => ({ ...row, total: row.qty && row.ref_cost ? num(row.qty) * num(row.ref_cost) : "" }),
     display: ["date", "recipient", "source", "qty", "ref_cost", "total", "group_name", "notes"],
+    labels: { total: "الإجمالي" },
+    sum: ["qty", "total"],
   },
   costs: {
     label: "التكاليف", icon: "🧾", table: "costs",
@@ -296,6 +327,7 @@ const TABLES = {
     ],
     computed: (row) => row,
     display: ["date", "category", "description", "source", "amount", "cost_type", "notes"],
+    sum: ["amount"],
   },
 };
 const TAB_ORDER = ["dashboard", "bags", "boxes", "purchases", "orders", "sales", "collect", "nafia", "gifts", "costs", "sources", "partners"];
@@ -402,9 +434,43 @@ function computeDash(rows) {
 
 /* ============ اللوجو ============ */
 
+/* علامة أنواط — نوط مضفور تنزل منه قطرة */
+function AnwatMark({ size = 56, light = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-label={BRAND_NAME}
+      style={{
+        display: "block", borderRadius: size * 0.24,
+        background: light ? "#241609" : "#FBF6EC",
+        border: light ? "1px solid rgba(243,233,216,.35)" : `1px solid ${COLORS.line}`,
+        boxShadow: light ? "0 6px 18px rgba(0,0,0,.35)" : "0 4px 12px rgba(74,37,17,.18)",
+      }}>
+      <defs>
+        <linearGradient id="anwGold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#E8C77A" />
+          <stop offset="1" stopColor="#A87C28" />
+        </linearGradient>
+      </defs>
+      {/* جسم النوط */}
+      <path d="M16 20 q16 -7 32 0 l-4 22 q-12 5 -24 0 Z"
+        fill="none" stroke="url(#anwGold)" strokeWidth="2.4" strokeLinejoin="round" />
+      {/* نسيج الخوص */}
+      <g stroke="url(#anwGold)" strokeWidth="1.2" opacity="0.75" strokeLinecap="round">
+        <path d="M20 24 l24 0M21 30 l22 0M22.5 36 l19 0" />
+        <path d="M26 19 l1.5 24M34 17.5 l0 26M42 19 l-1.5 24" />
+      </g>
+      {/* القطرة */}
+      <path d="M32 46 c0 0 5 7 5 10.5 a5 5 0 0 1 -10 0 c0 -3.5 5 -10.5 5 -10.5 Z"
+        fill="url(#anwGold)" />
+    </svg>
+  );
+}
+
 function LogoMark({ size = 56, light = false }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <AnwatMark size={size} light={light} />;
   return (
     <img src="icon.jpeg" alt={BRAND_NAME}
+      onError={() => setFailed(true)}
       style={{
         width: size, height: size, borderRadius: size * 0.24,
         objectFit: "cover", display: "block",
@@ -508,6 +574,58 @@ function FeatureRow({ light = false }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* حاجز أخطاء — يمنع الصفحة البيضاء ويعرض رسالة مفهومة */
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err) { console.error("UI error:", err); }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div dir="rtl" style={{
+        minHeight: "100vh", display: "flex", alignItems: "center",
+        justifyContent: "center", background: COLORS.bg, padding: 20,
+      }}>
+        <div style={{
+          maxWidth: 420, background: COLORS.surface, borderRadius: 16,
+          border: `1px solid ${COLORS.line}`, padding: 26, textAlign: "center",
+        }}>
+          <div style={{ marginBottom: 14, display: "flex", justifyContent: "center" }}>
+            <AnwatMark size={54} />
+          </div>
+          <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: COLORS.deep }}>
+            حدث خلل مؤقت
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 10, lineHeight: 2 }}>
+            نعتذر عن ذلك. أعد تحميل الصفحة، وإن تكرر تواصل معنا.
+          </div>
+          <button onClick={() => window.location.reload()}
+            style={{ ...primaryBtnStyle, marginTop: 18, padding: "11px 26px" }}>
+            إعادة تحميل
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
+/* شاشة تحميل بهوية العلامة */
+function Splash({ text = "جارٍ التحميل…" }) {
+  return (
+    <div dir="rtl" style={{
+      minHeight: "100vh", display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", gap: 16,
+      background: COLORS.bg,
+    }}>
+      <AnwatMark size={64} />
+      <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19, color: COLORS.deep, letterSpacing: 0.5 }}>
+        {BRAND_NAME}
+      </div>
+      <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>{text}</div>
     </div>
   );
 }
@@ -639,10 +757,10 @@ function CustomerOrderForm() {
         payload.delivery_location = [mapUrl, form.delivery_location].filter(Boolean).join(" | ");
       }
       const { error } = await supabase.from("incoming_orders").insert(payload);
-      if (error) { console.error(error); setErrMsg(error.message || "تعذّر إرسال الطلب"); setStatus("error"); return; }
+      if (error) { console.error(error); setErrMsg("تعذّر إرسال الطلب. تأكد من الاتصال وحاول مرة أخرى."); setStatus("error"); return; }
       setStatus("done");
     } catch (err) {
-      console.error(err); setErrMsg(String(err && err.message ? err.message : err)); setStatus("error");
+      console.error(err); setErrMsg("حدث خطأ غير متوقع. حاول مرة أخرى."); setStatus("error");
     }
   };
 
@@ -749,7 +867,7 @@ function CustomerOrderForm() {
         {/* شريط صور مصغّرة */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 7, marginTop: 14 }}>
           {[PHOTOS.pourA, PHOTOS.anwatA, PHOTOS.bucket].map((src) => (
-            <img key={src} src={src} alt="" loading="lazy"
+            <img key={src} src={src} alt="" loading="lazy" decoding="async"
               onError={(e) => { e.currentTarget.style.display = "none"; }}
               style={{
                 width: "100%", aspectRatio: "1/1", objectFit: "cover", display: "block",
@@ -954,7 +1072,7 @@ function CancelOrderPage({ token }) {
   const confirmCancel = async () => {
     setStatus("saving");
     const { data, error } = await supabase.rpc("cancel_order_by_token", { p_token: token, p_reason: reason || null });
-    if (error) { setErrMsg(error.message || "تعذّر إلغاء الطلب"); setStatus("error"); return; }
+    if (error) { setErrMsg("تعذّر إلغاء الطلب. حاول مرة أخرى أو تواصل معنا."); setStatus("error"); return; }
     if (data === "not_found") { setOrder(null); return; }
     setOrder((o) => ({ ...o, status: data === "cancelled" ? "cancelled" : data }));
     setStatus(data === "cancelled" ? "done" : "idle");
@@ -1304,7 +1422,7 @@ function LuxStage({ st, i }) {
       {/* شبكة الصور */}
       <div className={st.layout === "quad" ? "lux-grid quad" : "lux-grid wide"}>
         {st.imgs.map((src, k) => (
-          <img key={src + k} src={src} alt={st.ar} loading="lazy"
+          <img key={src + k} src={src} alt={st.ar} loading="lazy" decoding="async"
             onError={(e) => { e.currentTarget.style.display = "none"; }} />
         ))}
       </div>
@@ -1327,7 +1445,7 @@ function StoryPage() {
 
       {/* ===== الواجهة ===== */}
       <div className="lux-hero">
-        <img src={PHOTOS.drip} alt="الدبس ينزل من الأنواط"
+        <img src={PHOTOS.drip} alt="الدبس ينزل من الأنواط" fetchPriority="high" decoding="async"
           onError={(e) => { e.currentTarget.src = "pour.jpeg"; }} />
         <div className="lux-hero-veil" />
         <div className="lux-hero-in">
@@ -2490,17 +2608,22 @@ function MainApp({ session }) {
   const logout = async () => { await supabase.auth.signOut(); };
 
   if (!loaded) {
-    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg }}><div style={{ color: COLORS.inkSoft }}>جارِ تحميل البيانات…</div></div>;
+    return <Splash text="جارٍ تحميل البيانات…" />;
   }
 
   return (
     <div dir="rtl" style={{ minHeight: "100vh", background: COLORS.bg, color: COLORS.ink }}>
       <header style={{ background: `linear-gradient(135deg, ${COLORS.deep}, #3A1C0C)`, color: "#F3E9D8", padding: "20px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <LogoMark size={42} light />
+          <LogoMark size={46} light />
           <div>
-            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 19 }}>{BRAND_NAME}</div>
-            <div style={{ fontSize: 11.5, color: "#D8C4A8" }}>{session.user.email}</div>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 900, fontSize: 21, letterSpacing: 0.5 }}>
+              {BRAND_NAME}
+            </div>
+            <div style={{ fontSize: 10, color: GOLD_LIGHT, letterSpacing: 4, fontWeight: 700, marginTop: 1 }}>
+              {BRAND_LATIN}
+            </div>
+            <div style={{ fontSize: 11, color: "#D8C4A8", marginTop: 4 }}>{session.user.email}</div>
           </div>
         </div>
         <button onClick={logout} style={{ ...ghostBtnStyle, background: "rgba(255,255,255,.1)", color: "#F3E9D8", border: "1px solid rgba(255,255,255,.25)" }}>تسجيل خروج</button>
@@ -2976,7 +3099,12 @@ function printPartnerStatement(partner, row, withdrawals) {
 
   const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8" />
   <title>كشف حساب — ${partner.name}</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;700&display=swap" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://unpkg.com" />
+<link rel="preconnect" href="https://gxngygirhwyhnjvvwsah.supabase.co" />
+<link rel="preload" as="image" href="drip.jpeg" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&family=Tajawal:wght@400;700&display=swap" />
   <style>
     body { font-family: Tajawal, sans-serif; color: #2B1B12; padding: 34px; }
     h1 { font-family: Cairo, sans-serif; font-size: 21px; margin: 0 0 4px; }
@@ -3476,7 +3604,7 @@ function DataTable({ tableKey, config, rows, ordersRows, onReload, showToast }) 
           <div style={{ padding: "30px 16px", textAlign: "center", color: COLORS.inkSoft, fontSize: 13.5 }}>لا توجد سجلات بعد.</div>
         ) : (
           <table>
-            <thead><tr>{config.display.map((c) => <th key={c}>{config.columns.find((cc) => cc.key === c)?.label || c}</th>)}<th></th></tr></thead>
+            <thead><tr>{config.display.map((c) => <th key={c}>{config.columns.find((cc) => cc.key === c)?.label || (config.labels && config.labels[c]) || c}</th>)}<th></th></tr></thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
@@ -3490,6 +3618,23 @@ function DataTable({ tableKey, config, rows, ordersRows, onReload, showToast }) 
                 </tr>
               ))}
             </tbody>
+            {config.sum && config.sum.length > 0 && (
+              <tfoot>
+                <tr style={{ background: COLORS.amberLight, borderTop: `2px solid ${COLORS.primary}` }}>
+                  {config.display.map((c, i) => {
+                    if (i === 0) return <td key={c} style={{ fontWeight: 800, color: COLORS.deep }}>الإجمالي</td>;
+                    if (!config.sum.includes(c)) return <td key={c} />;
+                    const t = rows.reduce((acc, r) => acc + num(r[c]), 0);
+                    return (
+                      <td key={c} style={{ fontWeight: 800, color: COLORS.deep }}>
+                        {fmt(t, Number.isInteger(t) ? 0 : 2)}
+                      </td>
+                    );
+                  })}
+                  <td />
+                </tr>
+              </tfoot>
+            )}
           </table>
         )}
       </div>
@@ -3520,12 +3665,14 @@ function Root() {
   }
   if (hash === "#story") return <StoryPage />;
   if (hash === "#order") return <CustomerOrderForm />;
-  if (session === undefined) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg }}>جارِ التحقق…</div>;
+  if (session === undefined) return <Splash text="جارٍ التحقق…" />;
   if (!session) return <LoginScreen />;
   return <MainApp session={session} />;
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<Root />);
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <ErrorBoundary><Root /></ErrorBoundary>
+);
 </script>
 </body>
 </html>
