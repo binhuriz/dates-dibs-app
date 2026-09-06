@@ -352,8 +352,8 @@ const TABLES = {
     sum: ["amount"],
   },
 };
-const TAB_ORDER = ["dashboard", "bags", "boxes", "purchases", "orders", "sales", "collect", "nafia", "gifts", "costs", "sources", "partners"];
-const TAB_META = { dashboard: { label: "لوحة التحكم", icon: "📊" }, sources: { label: "ملخص المصادر", icon: "🗂️" }, partners: { label: "الشركاء", icon: "🤝" }, collect: { label: "التحصيل", icon: "💰" } };
+const TAB_ORDER = ["dashboard", "profit", "bags", "boxes", "purchases", "orders", "sales", "collect", "nafia", "gifts", "costs", "sources", "partners"];
+const TAB_META = { dashboard: { label: "لوحة التحكم", icon: "📊" }, profit: { label: "العائدات", icon: "📈" }, sources: { label: "ملخص المصادر", icon: "🗂️" }, partners: { label: "الشركاء", icon: "🤝" }, collect: { label: "التحصيل", icon: "💰" } };
 
 /* ============ طبقة الاتصال بقاعدة البيانات ============ */
 async function fetchTable(table) {
@@ -1811,6 +1811,263 @@ function StoryPage() {
   );
 }
 
+/* ============ العائدات حسب المصدر ============ */
+
+function ProfitPanel({ sales, nafia, costs, purchases, boxPrice }) {
+  const FARM = "إنتاج المزرعة", BOUGHT = "تمور مشتراة";
+  const [who, setWho] = useState("all");   // all | farm | bought
+
+  const calc = (src) => {
+    const sl = (sales || []).filter((r) => r.source === src);
+    const nf = (nafia || []).filter((r) => r.source === src);
+    const ct = (costs || []).filter((r) => r.source === src);
+    const boxes = sl.reduce((s, r) => s + num(r.qty), 0);
+    const salesRev = sl.reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
+    const nafiaRev = nf.reduce((s, r) => s + num(r.qty_sacks) * num(r.unit_price), 0);
+    const cost = ct.reduce((s, r) => s + num(r.amount), 0);
+    const collected = sl.filter((r) => r.collected)
+      .reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
+    return {
+      boxes, salesRev, nafiaRev, cost,
+      revenue: salesRev + nafiaRev,
+      net: salesRev + nafiaRev - cost,
+      collected, due: salesRev - collected,
+      avg: boxes > 0 ? salesRev / boxes : 0,
+      rows: sl,
+    };
+  };
+
+  const farm = calc(FARM);
+  const bought = calc(BOUGHT);
+  const generalCost = (costs || []).filter((r) => r.source === "عام")
+    .reduce((s, r) => s + num(r.amount), 0);
+
+  const Card = ({ title, icon, d, accent }) => {
+    const net = d.net;
+    return (
+      <div style={{
+        background: COLORS.surface, border: `1px solid ${COLORS.line}`,
+        borderInlineStart: `5px solid ${accent}`, borderRadius: 14, padding: 16,
+      }}>
+        <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16, color: COLORS.deep, marginBottom: 12 }}>
+          {icon} {title}
+        </div>
+
+        <table style={{ fontSize: 13 }}>
+          <tbody>
+            <tr>
+              <td style={{ color: COLORS.inkSoft, padding: "5px 0" }}>علب مباعة</td>
+              <td style={{ fontWeight: 700, textAlign: "left" }}>{fmt(d.boxes)} علبة</td>
+            </tr>
+            <tr>
+              <td style={{ color: COLORS.inkSoft, padding: "5px 0" }}>متوسط سعر العلبة</td>
+              <td style={{ fontWeight: 700, textAlign: "left" }}>{fmt(d.avg)} درهم</td>
+            </tr>
+            <tr><td colSpan={2}><div style={{ height: 1, background: COLORS.line, margin: "6px 0" }} /></td></tr>
+            <tr>
+              <td style={{ color: COLORS.inkSoft, padding: "5px 0" }}>إيراد المبيعات</td>
+              <td style={{ fontWeight: 700, textAlign: "left", color: COLORS.secondary }}>{fmt(d.salesRev)}</td>
+            </tr>
+            <tr>
+              <td style={{ color: COLORS.inkSoft, padding: "5px 0" }}>إيراد النفيعة</td>
+              <td style={{ fontWeight: 700, textAlign: "left", color: COLORS.secondary }}>{fmt(d.nafiaRev)}</td>
+            </tr>
+            <tr>
+              <td style={{ color: COLORS.inkSoft, padding: "5px 0" }}>− التكاليف</td>
+              <td style={{ fontWeight: 700, textAlign: "left", color: COLORS.alert }}>{fmt(d.cost)}</td>
+            </tr>
+            <tr style={{ background: COLORS.bg }}>
+              <td style={{ fontWeight: 800, padding: "9px 6px", color: COLORS.deep }}>صافي العائد</td>
+              <td style={{
+                fontWeight: 800, textAlign: "left", padding: "9px 6px", fontSize: 16,
+                fontFamily: "Cairo, sans-serif",
+                color: net >= 0 ? COLORS.secondary : COLORS.alert,
+              }}>{fmt(net)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 10, lineHeight: 1.9 }}>
+          محصّل <b style={{ color: COLORS.secondary }}>{fmt(d.collected)}</b>
+          {d.due > 0 && <> · بالذمم <b style={{ color: COLORS.alert }}>{fmt(d.due)}</b></>}
+        </div>
+      </div>
+    );
+  };
+
+  const shown = who === "farm" ? [["farm", farm]] : who === "bought" ? [["bought", bought]]
+    : [["farm", farm], ["bought", bought]];
+
+  /* ملخص لكل عميل: كم استلم من كل مصدر */
+  const byCustomer = useMemo(() => {
+    const map = {};
+    (sales || []).forEach((r) => {
+      const name = (r.customer || "").trim() || "— بلا اسم";
+      if (!map[name]) map[name] = {
+        name, farmQty: 0, boughtQty: 0, otherQty: 0,
+        farmVal: 0, boughtVal: 0, otherVal: 0, collected: 0, total: 0,
+      };
+      const q = num(r.qty), v = q * num(r.unit_price);
+      const m = map[name];
+      if (r.source === FARM)        { m.farmQty += q;   m.farmVal += v; }
+      else if (r.source === BOUGHT) { m.boughtQty += q; m.boughtVal += v; }
+      else                          { m.otherQty += q;  m.otherVal += v; }
+      m.total += v;
+      if (r.collected) m.collected += v;
+    });
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [sales]);
+
+  const listRows = (who === "farm" ? farm.rows : who === "bought" ? bought.rows
+    : [...farm.rows, ...bought.rows]).slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+
+  return (
+    <div>
+      <SectionTitle title="العائدات حسب المصدر"
+        subtitle="ربح كل جهة على حدة — المزرعة وإنتاج ناصر" />
+
+      {/* تصفية */}
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 16 }}>
+        {[
+          { k: "all", l: "الكل" },
+          { k: "farm", l: "🌴 إنتاج المزرعة" },
+          { k: "bought", l: "🧺 تمور مشتراة" },
+        ].map((o) => (
+          <button key={o.k} onClick={() => setWho(o.k)} style={{
+            ...ghostBtnStyle, padding: "8px 15px", fontSize: 12.5,
+            fontWeight: who === o.k ? 800 : 500,
+            background: who === o.k ? COLORS.primary : "#fff",
+            color: who === o.k ? "#fff" : COLORS.inkSoft,
+            borderColor: who === o.k ? COLORS.primary : COLORS.line,
+          }}>{o.l}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginBottom: 18 }}>
+        {shown.map(([k, d]) => k === "farm"
+          ? <Card key={k} title="إنتاج المزرعة" icon="🌴" d={d} accent={COLORS.secondary} />
+          : <Card key={k} title="تمور مشتراة — ناصر" icon="🧺" d={d} accent={COLORS.primary} />
+        )}
+      </div>
+
+      {generalCost > 0 && (
+        <div style={{
+          background: COLORS.amberLight, borderRadius: 10, padding: "10px 13px",
+          fontSize: 12, color: COLORS.deep, marginBottom: 18, lineHeight: 1.9,
+        }}>
+          ⚠️ {fmt(generalCost)} درهم تكاليف مسجّلة كـ«عام» — غير محسوبة على أي جهة.
+          وزّعها على المصدرين ليصحّ صافي كل جهة.
+        </div>
+      )}
+
+      {/* ملخص العملاء حسب المصدر */}
+      <SectionTitle title="العملاء ومصدر ما استلموه"
+        subtitle={byCustomer.length ? `${byCustomer.length} عميل` : "لا توجد مبيعات بعد"} />
+      {byCustomer.length > 0 && (
+        <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, overflow: "auto", marginBottom: 20 }}>
+          <table>
+            <thead>
+              <tr>
+                <th>العميل</th>
+                <th>🌴 من المزرعة</th>
+                <th>🧺 من تمور ناصر</th>
+                <th>الإجمالي</th>
+                <th>القيمة</th>
+                <th>الذمم</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byCustomer.map((c) => {
+                const due = c.total - c.collected;
+                return (
+                  <tr key={c.name}>
+                    <td style={{ fontWeight: 700 }}>{c.name}</td>
+                    <td style={{ color: c.farmQty > 0 ? COLORS.secondary : COLORS.inkSoft, fontWeight: c.farmQty > 0 ? 700 : 400 }}>
+                      {c.farmQty > 0 ? `${fmt(c.farmQty)} علبة` : "—"}
+                    </td>
+                    <td style={{ color: c.boughtQty > 0 ? COLORS.primary : COLORS.inkSoft, fontWeight: c.boughtQty > 0 ? 700 : 400 }}>
+                      {c.boughtQty > 0 ? `${fmt(c.boughtQty)} علبة` : "—"}
+                    </td>
+                    <td style={{ fontWeight: 700 }}>
+                      {fmt(c.farmQty + c.boughtQty + c.otherQty)}
+                      {c.otherQty > 0 && (
+                        <span style={{ color: COLORS.alert, fontSize: 11 }}> ({fmt(c.otherQty)} بلا مصدر)</span>
+                      )}
+                    </td>
+                    <td style={{ fontWeight: 700, color: COLORS.deep }}>{fmt(c.total)}</td>
+                    <td style={{ fontWeight: 700, color: due > 0 ? COLORS.alert : COLORS.secondary }}>
+                      {due > 0 ? fmt(due) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr style={{ background: COLORS.amberLight, borderTop: `2px solid ${COLORS.primary}` }}>
+                <td style={{ fontWeight: 800 }}>الإجمالي</td>
+                <td style={{ fontWeight: 800, color: COLORS.secondary }}>
+                  {fmt(byCustomer.reduce((s2, c) => s2 + c.farmQty, 0))} علبة
+                </td>
+                <td style={{ fontWeight: 800, color: COLORS.primary }}>
+                  {fmt(byCustomer.reduce((s2, c) => s2 + c.boughtQty, 0))} علبة
+                </td>
+                <td style={{ fontWeight: 800 }}>
+                  {fmt(byCustomer.reduce((s2, c) => s2 + c.farmQty + c.boughtQty + c.otherQty, 0))}
+                </td>
+                <td style={{ fontWeight: 800, color: COLORS.deep }}>
+                  {fmt(byCustomer.reduce((s2, c) => s2 + c.total, 0))}
+                </td>
+                <td style={{ fontWeight: 800, color: COLORS.alert }}>
+                  {fmt(byCustomer.reduce((s2, c) => s2 + (c.total - c.collected), 0))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* تفصيل عمليات البيع */}
+      <SectionTitle title="تفصيل المبيعات" subtitle={`${listRows.length} عملية`} />
+      <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, overflow: "auto" }}>
+        {listRows.length === 0 ? (
+          <div style={{ padding: "26px 16px", textAlign: "center", color: COLORS.inkSoft, fontSize: 13 }}>
+            لا توجد مبيعات مسجّلة.
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>التاريخ</th><th>العميل</th><th>المصدر</th>
+                <th>العلب</th><th>السعر</th><th>الإجمالي</th><th>التحصيل</th>
+              </tr>
+            </thead>
+            <tbody>
+              {listRows.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.date || "—"}</td>
+                  <td>{r.customer || "—"}</td>
+                  <td style={{ color: r.source === FARM ? COLORS.secondary : COLORS.primary, fontWeight: 700 }}>
+                    {r.source === FARM ? "🌴 المزرعة" : r.source === BOUGHT ? "🧺 مشتراة" : "— بلا مصدر"}
+                  </td>
+                  <td>{fmt(r.qty)}</td>
+                  <td>{fmt(r.unit_price)}</td>
+                  <td style={{ fontWeight: 700 }}>{fmt(num(r.qty) * num(r.unit_price))}</td>
+                  <td style={{ color: r.collected ? COLORS.secondary : COLORS.alert, fontWeight: 700 }}>
+                    {r.collected ? "محصّل" : "آجل"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.9 }}>
+        صافي كل جهة = إيراد المبيعات + إيراد النفيعة − التكاليف المسجّلة لها.
+        صافي عائد المزرعة هو ما يُقسّم على الشركاء في تبويب «الشركاء».
+      </div>
+    </div>
+  );
+}
+
 /* ============ التحصيل والذمم ============ */
 
 function CollectionsPanel({ sales, onReload, showToast }) {
@@ -2779,11 +3036,19 @@ function MainApp({ session }) {
       </nav>
 
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "18px 16px 60px" }}>
-        {(tab === "dashboard" || tab === "sources") && (
+        {(tab === "dashboard" || tab === "sources" || tab === "profit") && (
           <ToolsBar range={range} setRange={setRange} onExportBackup={exportBackup} onExportCSV={exportCSV} boxPrice={boxPrice} onChangePrice={changeBoxPrice} />
         )}
         {tab === "dashboard" && <Dashboard dash={dash} onReload={loadAll} />}
         {tab === "sources" && <SourceSummary summary={sourceSummary} />}
+        {tab === "profit" && (
+          <ProfitPanel
+            sales={filteredRows.sales || []}
+            nafia={filteredRows.nafia || []}
+            costs={filteredRows.costs || []}
+            purchases={filteredRows.purchases || []}
+            boxPrice={boxPrice} />
+        )}
         {tab === "collect" && (
           <CollectionsPanel sales={computedRows.sales || []} onReload={loadAll} showToast={showToast} />
         )}
