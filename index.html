@@ -2922,23 +2922,52 @@ function MainApp({ session }) {
     const pctSum = partners.reduce((s, p) => s + num(p.pct), 0);
     const withdrawals = data.withdrawals || [];
     const valueOf = (w) => (w.type === "علب دبس" ? num(w.qty) * DEFAULT_BOX_PRICE : num(w.amount));
+
+    /* أرقام المزرعة المالية */
+    const farmSalesRev = sourceSummaryAll.farm.salesRev;   // إيراد بيع العلب
+    const farmNafiaRev = sourceSummaryAll.farm.nafiaRev;   // إيراد النفيعة
+    const farmCost     = sourceSummaryAll.farm.cost;       // تكاليف المزرعة
+    /* علب المزرعة المباعة فعلاً */
+    const farmSoldBoxes = (computedRows.sales || [])
+      .filter((r) => r.source === "إنتاج المزرعة")
+      .reduce((s, r) => s + num(r.qty), 0);
+
+    /* نصيب كل شريك من العلب، وكم استلم منها */
+    const base = partners.map((p) => {
+      const mine = withdrawals.filter((w) => w.partner_name === p.name);
+      const boxShare = netBoxes * (num(p.pct) / 100);
+      const boxTaken = mine.filter((w) => w.type === "علب دبس").reduce((s, w) => s + num(w.qty), 0);
+      const cashTaken = mine.filter((w) => w.type !== "علب دبس").reduce((s, w) => s + num(w.amount), 0);
+      return { p, mine, boxShare, boxTaken, cashTaken, sellable: Math.max(0, boxShare - boxTaken) };
+    });
+    /* مجموع العلب المتروكة للبيع باسم الشركاء */
+    const totalSellable = base.reduce((s, b) => s + b.sellable, 0);
+
     return {
       netFarm, pctSum, farmBoxes, farmGifts, netBoxes,
-      rows: partners.map((p) => {
-        const mine = withdrawals.filter((w) => w.partner_name === p.name);
+      farmSalesRev, farmNafiaRev, farmCost, farmSoldBoxes, totalSellable,
+      rows: base.map(({ p, mine, boxShare, boxTaken, cashTaken, sellable }) => {
         const share = netFarm * (num(p.pct) / 100);
         const withdrawn = mine.reduce((s, w) => s + valueOf(w), 0);
-        /* نصيب الشريك من العلب بعد خصم العطايا */
-        const boxShare = netBoxes * (num(p.pct) / 100);
-        const giftCut = farmGifts * (num(p.pct) / 100);   // ما تحمّله من العطايا
-        const boxTaken = mine.filter((w) => w.type === "علب دبس").reduce((s, w) => s + num(w.qty), 0);
+        const giftCut = farmGifts * (num(p.pct) / 100);
+
+        /* حصته من إيراد بيع العلب — بنسبة ما تُرك للبيع باسمه */
+        const salesShare = totalSellable > 0
+          ? farmSalesRev * (sellable / totalSellable) : 0;
+        /* النفيعة والتكاليف تُقسّم بالنِّسب لأنها تخص المزرعة كلها */
+        const nafiaShare = farmNafiaRev * (num(p.pct) / 100);
+        const costShare  = farmCost * (num(p.pct) / 100);
+        /* المستحق نقداً = إيراده − تكاليفه − ما سحبه نقداً */
+        const dueCash = salesShare + nafiaShare - costShare - cashTaken;
+
         return {
           ...p, share, withdrawn, remaining: share - withdrawn,
           boxShare, giftCut, boxTaken, boxLeft: boxShare - boxTaken,
+          sellable, salesShare, nafiaShare, costShare, cashTaken, dueCash,
         };
       }),
     };
-  }, [data.partners, data.withdrawals, computedRows.gifts, sourceSummaryAll]);
+  }, [data.partners, data.withdrawals, computedRows.gifts, computedRows.sales, sourceSummaryAll]);
 
   const acceptIncoming = async (item) => {
     const notesParts = [];
@@ -2989,7 +3018,10 @@ function MainApp({ session }) {
     showToast("تم إلغاء الطلب — أرسل إشعاراً للعميل من قائمة الملغاة");
   };
 
-  const logout = async () => { await supabase.auth.signOut(); };
+  const logout = async () => {
+    await supabase.auth.signOut();
+    if (window.location.hash !== "#admin") window.location.hash = "#admin";
+  };
 
   if (!loaded) {
     return <Splash text="جارٍ تحميل البيانات…" />;
@@ -3856,6 +3888,74 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
         <button onClick={addPartner} style={primaryBtnStyle}>+ إضافة شريك</button>
       </div>
 
+      {/* ===== تسوية الشركاء ===== */}
+      <SectionTitle title="تسوية الشركاء" subtitle="نصيب كل شريك — علباً ونقداً" />
+
+      <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
+        {distribution.rows.map((r) => (
+          <div key={r.id} style={{
+            background: COLORS.surface, border: `1px solid ${COLORS.line}`,
+            borderInlineStart: `5px solid ${r.dueCash >= 0 ? COLORS.secondary : COLORS.alert}`,
+            borderRadius: 14, padding: "14px 16px",
+          }}>
+            {/* الاسم والمستحق */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16, color: COLORS.deep }}>
+                {r.name}
+              </div>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 11, color: COLORS.inkSoft }}>المستحق له</div>
+                <div style={{
+                  fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 22,
+                  color: r.dueCash >= 0 ? COLORS.secondary : COLORS.alert, lineHeight: 1.2,
+                }}>
+                  {fmt(r.dueCash)} <span style={{ fontSize: 12 }}>درهم</span>
+                </div>
+              </div>
+            </div>
+
+            {/* شريط العلب: مستلم مقابل متروك للبيع */}
+            {r.boxShare > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ display: "flex", height: 9, borderRadius: 5, overflow: "hidden", background: COLORS.line }}>
+                  <div style={{ width: `${(r.boxTaken / r.boxShare) * 100}%`, background: COLORS.primary }} />
+                  <div style={{ width: `${(r.sellable / r.boxShare) * 100}%`, background: COLORS.secondary }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginTop: 6, flexWrap: "wrap", gap: 6 }}>
+                  <span style={{ color: COLORS.primary }}>
+                    🏠 استلم <b>{fmt(r.boxTaken)}</b> علبة
+                  </span>
+                  <span style={{ color: COLORS.secondary }}>
+                    💰 بيع له <b>{fmt(r.sellable, 1)}</b> علبة
+                  </span>
+                  <span style={{ color: COLORS.inkSoft }}>
+                    نصيبه {fmt(r.boxShare, 1)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* تفصيل المبلغ */}
+            <div style={{
+              display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12, paddingTop: 10,
+              borderTop: `1px dashed ${COLORS.line}`, fontSize: 12,
+            }}>
+              <span>من البيع <b style={{ color: COLORS.secondary }}>{fmt(r.salesShare + r.nafiaShare)}</b></span>
+              {r.costShare > 0 && <span>− تكاليف <b style={{ color: COLORS.alert }}>{fmt(r.costShare)}</b></span>}
+              {r.cashTaken > 0 && <span>− سحب نقدي <b style={{ color: COLORS.alert }}>{fmt(r.cashTaken)}</b></span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{
+        background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: 10,
+        padding: "11px 14px", fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 22, lineHeight: 2,
+      }}>
+        <b style={{ color: COLORS.deep }}>القاعدة:</b> ما يستلمه الشريك علباً يخرج من حسابه المالي،
+        وما يتركه يُباع باسمه فيأخذ قيمته.
+      </div>
+
       <PartnerBatches partners={partners} boxesRows={boxesRows} withdrawals={withdrawals}
         farmGifts={distribution.farmGifts} boxPrice={boxPrice || DEFAULT_BOX_PRICE} showToast={showToast} />
 
@@ -4057,21 +4157,25 @@ function Root() {
     const t = (hash.split("=")[1] || "").trim();
     return <CancelOrderPage token={t} />;
   }
-  /* شاشة الافتتاح تظهر مرة واحدة في الجلسة لصفحات العميل */
-  const isCustomer = hash === "#story" || hash === "#order";
-  if (isCustomer && !introDone) {
+
+  /* لوحة التحكم خلف رابط منفصل — لا تظهر للعملاء أبداً */
+  if (hash === "#admin") {
+    if (session === undefined) return <Splash text="جارٍ التحقق…" />;
+    if (!session) return <LoginScreen />;
+    return <MainApp session={session} />;
+  }
+
+  /* كل ما عدا ذلك — بما فيه الرابط الجذر — صفحات العميل */
+  const page = hash === "#order" ? <CustomerOrderForm /> : <StoryPage />;
+  if (!introDone) {
     return (
       <>
-        {hash === "#story" ? <StoryPage /> : <CustomerOrderForm />}
+        {page}
         <IntroScreen onDone={() => setIntroDone(true)} />
       </>
     );
   }
-  if (hash === "#story") return <StoryPage />;
-  if (hash === "#order") return <CustomerOrderForm />;
-  if (session === undefined) return <Splash text="جارٍ التحقق…" />;
-  if (!session) return <LoginScreen />;
-  return <MainApp session={session} />;
+  return page;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(
