@@ -3542,9 +3542,10 @@ function printPartnerStatement(partner, row, withdrawals) {
     <div class="sub">${BRAND_NAME} · نظام إدارة التمر والدبس · تاريخ الإصدار: ${todayISO()}</div>
     <div class="cards">
       <div class="card"><div class="l">نسبة الشراكة</div><div class="v">${fmt(partner.pct, 2)}%</div></div>
-      <div class="card"><div class="l">المستحق</div><div class="v" style="color:#6B7A3A">${fmt(row.share)}</div></div>
-      <div class="card"><div class="l">المسحوب</div><div class="v" style="color:#B5651D">${fmt(row.withdrawn)}</div></div>
-      <div class="card"><div class="l">المتبقي</div><div class="v" style="color:${row.remaining >= 0 ? "#6B7A3A" : "#A63A32"}">${fmt(row.remaining)}</div></div>
+      <div class="card"><div class="l">قيمة ما بيع له</div><div class="v" style="color:#6B7A3A">${fmt((row.salesShare || 0) + (row.nafiaShare || 0))}</div></div>
+      <div class="card"><div class="l">− تكاليفه</div><div class="v" style="color:#A63A32">${fmt(row.costShare || 0)}</div></div>
+      <div class="card"><div class="l">− سحب نقدي</div><div class="v" style="color:#B5651D">${fmt(row.cashTaken || 0)}</div></div>
+      <div class="card"><div class="l">المستحق له</div><div class="v" style="color:${(row.dueCash || 0) >= 0 ? "#6B7A3A" : "#A63A32"}">${fmt(row.dueCash || 0)}</div></div>
     </div>
     <h3 style="font-family:Cairo;font-size:15px;margin:0 0 10px">نصيبه من العلب المنتجة</h3>
     <div class="cards">
@@ -3558,7 +3559,7 @@ function printPartnerStatement(partner, row, withdrawals) {
       <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#6B5342">لا توجد سحوبات</td></tr>'}</tbody>
     </table>
     <div class="foot">
-      المستحق محسوب من صافي عائد إنتاج المزرعة وفق نسبة الشراكة. قيمة علبة الدبس ${DEFAULT_BOX_PRICE} درهم.
+      ما يستلمه الشريك علباً يخرج من حسابه المالي، وما يتركه يُباع باسمه فيأخذ قيمته. قيمة علبة الدبس ${DEFAULT_BOX_PRICE} درهم.
     </div>
     <script>window.onload = () => window.print();<\/script>
   </body></html>`;
@@ -3853,9 +3854,18 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
                 <button onClick={() => removePartner(p.id)} style={dangerBtnStyle}>حذف</button>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginTop: 10, fontSize: 12.5 }}>
-                <div><div style={{ color: COLORS.inkSoft }}>المستحق</div><div style={{ fontWeight: 700, color: COLORS.secondary }}>{fmt(row.share)}</div></div>
-                <div><div style={{ color: COLORS.inkSoft }}>المسحوب</div><div style={{ fontWeight: 700, color: COLORS.primary }}>{fmt(row.withdrawn)}</div></div>
-                <div><div style={{ color: COLORS.inkSoft }}>المتبقي</div><div style={{ fontWeight: 800, color: row.remaining >= 0 ? COLORS.secondary : COLORS.alert }}>{fmt(row.remaining)}</div></div>
+                <div>
+                  <div style={{ color: COLORS.inkSoft }}>قيمة ما بيع له</div>
+                  <div style={{ fontWeight: 700, color: COLORS.secondary }}>{fmt(row.salesShare + row.nafiaShare)}</div>
+                </div>
+                <div>
+                  <div style={{ color: COLORS.inkSoft }}>سحب نقدي</div>
+                  <div style={{ fontWeight: 700, color: COLORS.primary }}>{fmt(row.cashTaken)}</div>
+                </div>
+                <div>
+                  <div style={{ color: COLORS.inkSoft }}>المستحق له</div>
+                  <div style={{ fontWeight: 800, color: row.dueCash >= 0 ? COLORS.secondary : COLORS.alert }}>{fmt(row.dueCash)}</div>
+                </div>
               </div>
 
               {/* نصيب الشريك من العلب المنتجة */}
