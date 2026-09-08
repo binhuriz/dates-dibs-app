@@ -4153,13 +4153,33 @@ function Root() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  /* Supabase يمسح الهاش بعد التحقق — نعيده حتى يبقى الرابط صحيحاً عند التحديث */
+  useEffect(() => {
+    let admin = false;
+    try { admin = sessionStorage.getItem("anwat_admin") === "1"; } catch (e) {}
+    if (admin && (window.location.hash === "" || window.location.hash === "#")) {
+      window.history.replaceState(null, "", "#admin");
+      setHash("#admin");
+    }
+  }, [session]);
+
   if (hash.startsWith("#cancel")) {
     const t = (hash.split("=")[1] || "").trim();
     return <CancelOrderPage token={t} />;
   }
 
-  /* لوحة التحكم خلف رابط منفصل — لا تظهر للعملاء أبداً */
-  if (hash === "#admin") {
+  /* لوحة التحكم خلف رابط منفصل — لا تظهر للعملاء أبداً.
+     نثبّت الوضع في sessionStorage لأن Supabase يمسح الهاش عند التحقق. */
+  const isAdminHash = hash === "#admin";
+  const wasAdmin = (() => {
+    try { return sessionStorage.getItem("anwat_admin") === "1"; } catch (e) { return false; }
+  })();
+  if (isAdminHash) { try { sessionStorage.setItem("anwat_admin", "1"); } catch (e) {} }
+  if (hash === "#order" || hash === "#story") {
+    try { sessionStorage.removeItem("anwat_admin"); } catch (e) {}
+  }
+
+  if (isAdminHash || (wasAdmin && (hash === "" || hash === "#"))) {
     if (session === undefined) return <Splash text="جارٍ التحقق…" />;
     if (!session) return <LoginScreen />;
     return <MainApp session={session} />;
