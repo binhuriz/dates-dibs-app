@@ -191,6 +191,10 @@ const SOURCE_OPTIONS = ["إنتاج المزرعة", "تمور مشتراة"];
 const PURCHASE_METHOD_OPTIONS = ["بالصندوق", "بالنخلة"];
 const COLLECT_OPTIONS = ["كاش", "تحويل بنكي"];
 const WITHDRAWAL_TYPES = ["نقدي", "علب دبس"];
+const BATCH_OPTIONS = [
+  "القطفة الأولى", "القطفة الثانية", "القطفة الثالثة",
+  "القطفة الرابعة", "القطفة الخامسة", "القطفة السادسة",
+];
 
 const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 const fmt = (v, digits = 0) => new Intl.NumberFormat("ar-EG", { maximumFractionDigits: digits }).format(v || 0);
@@ -229,13 +233,14 @@ const TABLES = {
     label: "إنتاج العلب", icon: "📦", table: "boxes",
     columns: [
       { key: "date", label: "التاريخ", type: "date" },
+      { key: "batch", label: "القطفة", type: "select", options: BATCH_OPTIONS, required: true },
       { key: "source", label: "مصدر التمر", type: "select", options: SOURCE_OPTIONS, required: true },
       { key: "box_count", label: "عدد العلب المنتجة", type: "number" },
       { key: "box_weight", label: "وزن العلبة (كجم)", type: "number" },
       { key: "notes", label: "ملاحظات", type: "text" },
     ],
     computed: (row) => ({ ...row, total_dibs: row.box_count && row.box_weight ? num(row.box_count) * num(row.box_weight) : "" }),
-    display: ["date", "source", "box_count", "box_weight", "total_dibs", "notes"],
+    display: ["date", "batch", "source", "box_count", "box_weight", "total_dibs", "notes"],
     labels: { total_dibs: "إجمالي الدبس (كجم)" },
     sum: ["box_count", "total_dibs"],
   },
@@ -3577,12 +3582,23 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
   const [who, setWho] = useState("");   // "" = كل الشركاء
 
   /* قطفات إنتاج المزرعة فقط، الأحدث أولاً */
-  const batches = useMemo(
-    () => (boxesRows || [])
-      .filter((b) => b.source === "إنتاج المزرعة" && num(b.box_count) > 0)
-      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))),
-    [boxesRows]
-  );
+  /* تجميع الإنتاج حسب القطفة */
+  const batches = useMemo(() => {
+    const rows = (boxesRows || [])
+      .filter((b) => b.source === "إنتاج المزرعة" && num(b.box_count) > 0);
+    const map = {};
+    rows.forEach((b) => {
+      const key = b.batch || "بدون قطفة";
+      if (!map[key]) map[key] = { batch: key, box_count: 0, date: b.date, id: key };
+      map[key].box_count += num(b.box_count);
+      if (b.date && (!map[key].date || b.date < map[key].date)) map[key].date = b.date;
+    });
+    const order = (k) => {
+      const i = BATCH_OPTIONS.indexOf(k);
+      return i === -1 ? 99 : i;
+    };
+    return Object.values(map).sort((a, b) => order(a.batch) - order(b.batch));
+  }, [boxesRows]);
 
   const totalBoxes = batches.reduce((s, b) => s + num(b.box_count), 0);
   const gifts = num(farmGifts);
@@ -3597,10 +3613,17 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
     .filter((w) => w.partner_name === p.name && w.type === "علب دبس")
     .reduce((s, w) => s + num(w.qty), 0);
 
+  /* ما استلمه من قطفة بعينها */
+  const takenFrom = (p, batchName) => (withdrawals || [])
+    .filter((w) => w.partner_name === p.name && w.type === "علب دبس" && (w.batch || "بدون قطفة") === batchName)
+    .reduce((s, w) => s + num(w.qty), 0);
+
   const copyPlan = (p) => {
-    const lines = batches
-      .map((b) => `• ${b.date || "بدون تاريخ"}: ${fmt(shareOf(b, p), 1)} علبة (من ${fmt(b.box_count)})`)
-      .filter(Boolean);
+    const lines = batches.map((b) => {
+      const tk = takenFrom(p, b.batch);
+      return `• ${b.batch}: نصيبه ${fmt(shareOf(b, p), 1)} علبة`
+        + (tk > 0 ? ` — استلم ${fmt(tk)}` : "");
+    });
     if (!lines.length) { showToast("لا توجد قطفات مسجّلة"); return; }
     const total = netTotal * (num(p.pct) / 100);
     navigator.clipboard?.writeText([
@@ -3659,13 +3682,25 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
           <tbody>
             {batches.map((b) => (
               <tr key={b.id}>
-                <td style={{ fontWeight: 600 }}>{b.date || "—"}</td>
+                <td style={{ fontWeight: 700 }}>
+                  {b.batch}
+                  {b.date && <div style={{ fontSize: 10.5, color: COLORS.inkSoft, fontWeight: 400 }}>{b.date}</div>}
+                </td>
                 <td>{fmt(b.box_count)}</td>
-                {shown.map((p) => (
-                  <td key={p.id} style={{ fontWeight: 700, color: COLORS.deep }}>
-                    {fmt(shareOf(b, p), 1)}
-                  </td>
-                ))}
+                {shown.map((p) => {
+                  const sh = shareOf(b, p);
+                  const tk = takenFrom(p, b.batch);
+                  return (
+                    <td key={p.id} style={{ fontWeight: 700, color: COLORS.deep }}>
+                      {fmt(sh, 1)}
+                      {tk > 0 && (
+                        <div style={{ fontSize: 10.5, color: COLORS.primary, fontWeight: 700 }}>
+                          استلم {fmt(tk)}
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
             <tr style={{ background: COLORS.bg }}>
@@ -3776,7 +3811,7 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
   );
 }
 function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, boxPrice, onReload, showToast }) {
-  const [wForm, setWForm] = useState({ date: todayISO(), partner_name: "", type: "نقدي", qty: "", amount: "", notes: "" });
+  const [wForm, setWForm] = useState({ date: todayISO(), partner_name: "", type: "نقدي", batch: "", qty: "", amount: "", notes: "" });
   const [showForm, setShowForm] = useState(false);
 
   const updatePartner = async (p, field, value) => {
@@ -3788,8 +3823,8 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
 
   const submitW = async (e) => {
     e.preventDefault();
-    await insertRow("withdrawals", { date: wForm.date, partner_name: wForm.partner_name, type: wForm.type, qty: wForm.type === "علب دبس" ? num(wForm.qty) : null, amount: wForm.type === "نقدي" ? num(wForm.amount) : null, notes: wForm.notes });
-    setWForm({ date: todayISO(), partner_name: "", type: "نقدي", qty: "", amount: "", notes: "" });
+    await insertRow("withdrawals", { date: wForm.date, partner_name: wForm.partner_name, type: wForm.type, batch: wForm.type === "علب دبس" ? (wForm.batch || null) : null, qty: wForm.type === "علب دبس" ? num(wForm.qty) : null, amount: wForm.type === "نقدي" ? num(wForm.amount) : null, notes: wForm.notes });
+    setWForm({ date: todayISO(), partner_name: "", type: "نقدي", batch: "", qty: "", amount: "", notes: "" });
     setShowForm(false);
     onReload();
     showToast("تم تسجيل السحب");
@@ -3985,7 +4020,13 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
               {WITHDRAWAL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
             {wForm.type === "علب دبس" ? (
-              <input type="number" placeholder="الكمية (علبة)" value={wForm.qty} onChange={(e) => setWForm((f) => ({ ...f, qty: e.target.value }))} style={inputStyle} />
+              <>
+                <select value={wForm.batch} onChange={(e) => setWForm((f) => ({ ...f, batch: e.target.value }))} style={inputStyle}>
+                  <option value="">— من أي قطفة —</option>
+                  {BATCH_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <input type="number" placeholder="الكمية (علبة)" value={wForm.qty} onChange={(e) => setWForm((f) => ({ ...f, qty: e.target.value }))} style={inputStyle} />
+              </>
             ) : (
               <input type="number" placeholder="المبلغ" value={wForm.amount} onChange={(e) => setWForm((f) => ({ ...f, amount: e.target.value }))} style={inputStyle} />
             )}
@@ -3996,11 +4037,12 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
       )}
       <div style={{ background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.line}`, overflow: "auto" }}>
         <table>
-          <thead><tr><th>التاريخ</th><th>الشريك</th><th>النوع</th><th>الكمية/المبلغ</th><th>القيمة</th><th></th></tr></thead>
+          <thead><tr><th>التاريخ</th><th>الشريك</th><th>النوع</th><th>القطفة</th><th>الكمية/المبلغ</th><th>القيمة</th><th></th></tr></thead>
           <tbody>
             {(withdrawals || []).map((w) => (
               <tr key={w.id}>
                 <td>{w.date}</td><td>{w.partner_name}</td><td>{w.type}</td>
+                <td style={{ color: COLORS.inkSoft }}>{w.batch || "—"}</td>
                 <td>{w.type === "علب دبس" ? `${fmt(w.qty)} علبة` : fmt(w.amount)}</td>
                 <td style={{ fontWeight: 700, color: COLORS.primary }}>{fmt(valueOf(w))}</td>
                 <td><button onClick={() => removeW(w.id)} style={dangerBtnStyle}>حذف</button></td>
