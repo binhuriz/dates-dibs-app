@@ -2189,10 +2189,10 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
     order_date: order.order_date || "",
     notes: order.notes || "",
   });
-  const [qty, setQty] = useState("");
+  const [qtyFarm, setQtyFarm] = useState("");
+  const [qtyBought, setQtyBought] = useState("");
   const [price, setPrice] = useState(boxPrice);
   const [pay, setPay] = useState("كاش");
-  const [source, setSource] = useState(SOURCE_OPTIONS[0]);
   const [batch, setBatch] = useState("");
   const [editLine, setEditLine] = useState(null);   // id السطر تحت التعديل
   const [lineDraft, setLineDraft] = useState({ qty: "", unit_price: "" });
@@ -2228,23 +2228,38 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
 
   /* تسجيل تسليم جديد */
   const deliver = (collected) => {
-    const q = num(qty || rem);
+    const qf = num(qtyFarm), qb = num(qtyBought);
+    const total = qf + qb;
     const up = num(price);
-    if (q <= 0) { showToast("أدخل كمية صحيحة"); return; }
-    if (q > rem) { showToast("الكمية أكبر من المتبقي"); return; }
+    if (total <= 0) { showToast("أدخل كمية صحيحة"); return; }
+    if (total > rem) { showToast(`الكمية (${fmt(total)}) أكبر من المتبقي (${fmt(rem)})`); return; }
     if (up <= 0) { showToast("أدخل سعراً صحيحاً"); return; }
+    if (qf > 0 && !batch) { showToast("اختر القطفة لعلب المزرعة"); return; }
+
+    /* تحذير نقص المخزون — مع إمكانية المتابعة */
+    const shortFarm = stock ? qf - num(stock.farm) : 0;
+    const shortBought = stock ? qb - num(stock.bought) : 0;
+    if (shortFarm > 0 || shortBought > 0) {
+      const parts = [];
+      if (shortFarm > 0) parts.push(`🌴 المزرعة: ناقص ${fmt(shortFarm)} علبة`);
+      if (shortBought > 0) parts.push(`🧺 مشتراة: ناقص ${fmt(shortBought)} علبة`);
+      if (!window.confirm(`⚠️ المخزون لا يكفي:\n${parts.join("\n")}\n\nتريد المتابعة على أي حال؟`)) return;
+    }
+
     run("deliver", async () => {
-      await insertRow("sales", {
+      const common = {
         date: todayISO(), order_id: order.id, customer: order.customer_name,
-        qty: q, unit_price: up, source, batch: batch || null,
+        unit_price: up,
         payment_method: collected ? pay : null,
         collected: !!collected,
         collected_at: collected ? todayISO() : null,
         notes: "تسليم من قائمة الطلبات",
-      });
-      setQty("");
-    }, q < rem
-      ? `تسليم جزئي ${fmt(q)} علبة — بقي ${fmt(rem - q)} بانتظار التسليم`
+      };
+      if (qf > 0) await insertRow("sales", { ...common, qty: qf, source: SOURCE_OPTIONS[0], batch });
+      if (qb > 0) await insertRow("sales", { ...common, qty: qb, source: SOURCE_OPTIONS[1], batch: null });
+      setQtyFarm(""); setQtyBought("");
+    }, total < rem
+      ? `تسليم جزئي ${fmt(total)} علبة — بقي ${fmt(rem - total)} بانتظار التسليم`
       : (collected ? "تم تسليم الطلب كاملاً ✅" : "تم تسليم الطلب كاملاً (آجل)"));
   };
 
@@ -2326,11 +2341,61 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
         {rem > 0 && (
           <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: 13, marginBottom: 16 }}>
             <div style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.deep, marginBottom: 10 }}>تسجيل تسليم</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-              <label style={{ ...lbl, flex: "1 1 80px" }}>الكمية
-                <input type="number" min="1" max={rem} value={qty} placeholder={`${rem}`}
-                  onChange={(e) => setQty(e.target.value)} style={{ ...inputStyle, marginTop: 4, textAlign: "center" }} />
-              </label>
+            {/* الكمية من كل مصدر */}
+            <div style={{ display: "grid", gap: 9 }}>
+              {[
+                { key: "farm", icon: "🌴", label: "من إنتاج المزرعة",
+                  val: qtyFarm, set: setQtyFarm, avail: stock ? num(stock.farm) : null, accent: COLORS.secondary },
+                { key: "bought", icon: "🧺", label: "من التمور المشتراة",
+                  val: qtyBought, set: setQtyBought, avail: stock ? num(stock.bought) : null, accent: COLORS.primary },
+              ].map((r) => {
+                const v = num(r.val);
+                const short = r.avail !== null && v > r.avail;
+                return (
+                  <div key={r.key} style={{
+                    display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap",
+                    background: COLORS.bg, borderRadius: 10, padding: "9px 11px",
+                    border: `1px solid ${short ? COLORS.alert : COLORS.line}`,
+                  }}>
+                    <span style={{ flex: "1 1 130px", fontSize: 12.5, fontWeight: 700, color: r.accent }}>
+                      {r.icon} {r.label}
+                      {r.avail !== null && (
+                        <span style={{ color: COLORS.inkSoft, fontWeight: 400, fontSize: 11 }}>
+                          {" "}· متوفر {fmt(r.avail)}
+                        </span>
+                      )}
+                    </span>
+                    <input type="number" min="0" value={r.val} placeholder="0"
+                      onChange={(e) => r.set(e.target.value)}
+                      style={{ ...inputStyle, width: 80, textAlign: "center",
+                               borderColor: short ? COLORS.alert : COLORS.line }} />
+                    {r.avail !== null && (
+                      <button type="button" onClick={() => r.set(String(Math.max(0, Math.min(r.avail, rem - num(r.key === "farm" ? qtyBought : qtyFarm)))))}
+                        style={{ ...ghostBtnStyle, padding: "6px 10px", fontSize: 11 }}>
+                        الأقصى
+                      </button>
+                    )}
+                    {short && (
+                      <span style={{ flexBasis: "100%", fontSize: 11, color: COLORS.alert, fontWeight: 700 }}>
+                        ⚠️ ناقص {fmt(v - r.avail)} علبة من هذا المصدر
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* القطفة والسعر والتحصيل */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 10 }}>
+              {num(qtyFarm) > 0 && (
+                <label style={{ ...lbl, flex: "1 1 130px" }}>قطفة علب المزرعة
+                  <select value={batch} onChange={(e) => setBatch(e.target.value)}
+                    style={{ ...inputStyle, marginTop: 4 }}>
+                    <option value="">— اختر القطفة —</option>
+                    {BATCH_OPTIONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                </label>
+              )}
               <label style={{ ...lbl, flex: "1 1 90px" }}>سعر العلبة
                 <input type="number" min="0" value={price}
                   onChange={(e) => setPrice(e.target.value)} style={{ ...inputStyle, marginTop: 4, textAlign: "center" }} />
@@ -2340,28 +2405,13 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
                   {COLLECT_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
               </label>
-              <label style={{ ...lbl, flex: "1 1 100%" }}>القطفة
-                <select value={batch} onChange={(e) => setBatch(e.target.value)}
-                  style={{ ...inputStyle, marginTop: 4 }}>
-                  <option value="">— اختر القطفة —</option>
-                  {BATCH_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-              </label>
-              <label style={{ ...lbl, flex: "1 1 100%" }}>يُخصم من مخزون
-                <select value={source} onChange={(e) => setSource(e.target.value)}
-                  style={{ ...inputStyle, marginTop: 4 }}>
-                  {SOURCE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-                {stock && (
-                  <div style={{ fontSize: 11, color: COLORS.inkSoft, marginTop: 5, lineHeight: 1.8 }}>
-                    المتوفر — 🌴 المزرعة: <b style={{ color: num(stock.farm) > 0 ? COLORS.secondary : COLORS.alert }}>{fmt(stock.farm)}</b>
-                    {" · "}🧺 مشتراة: <b style={{ color: num(stock.bought) > 0 ? COLORS.secondary : COLORS.alert }}>{fmt(stock.bought)}</b>
-                  </div>
-                )}
-              </label>
             </div>
+
             <div style={{ fontSize: 12, color: COLORS.deep, fontWeight: 700, margin: "10px 0" }}>
-              الإجمالي: {fmt(num(qty || rem) * num(price))} درهم
+              {fmt(num(qtyFarm) + num(qtyBought))} علبة · الإجمالي {fmt((num(qtyFarm) + num(qtyBought)) * num(price))} درهم
+              {(num(qtyFarm) + num(qtyBought)) > rem && (
+                <span style={{ color: COLORS.alert }}> — أكبر من المتبقي ({fmt(rem)})</span>
+              )}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button disabled={busy === "deliver"} onClick={() => deliver(true)}
