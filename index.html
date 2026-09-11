@@ -349,13 +349,14 @@ const TABLES = {
       { key: "date", label: "التاريخ", type: "date" },
       { key: "recipient", label: "اسم المستلم", type: "text" },
       { key: "source", label: "مصدر التمر", type: "select", options: SOURCE_OPTIONS, required: true },
+      { key: "batch", label: "القطفة", type: "select", options: BATCH_OPTIONS },
       { key: "qty", label: "الكمية (علبة)", type: "number" },
       { key: "ref_cost", label: "التكلفة المرجعية/علبة", type: "number" },
       { key: "group_name", label: "المجموعة", type: "text" },
       { key: "notes", label: "ملاحظات", type: "text" },
     ],
     computed: (row) => ({ ...row, total: row.qty && row.ref_cost ? num(row.qty) * num(row.ref_cost) : "" }),
-    display: ["date", "recipient", "source", "qty", "ref_cost", "total", "group_name", "notes"],
+    display: ["date", "recipient", "source", "batch", "qty", "ref_cost", "total", "group_name", "notes"],
     labels: { total: "الإجمالي" },
     sum: ["qty", "total"],
   },
@@ -2981,8 +2982,20 @@ function MainApp({ session }) {
     const batchNames = Object.keys(bMap).sort((a, b) => ordB(a) - ordB(b));
     const totalProduced = batchNames.reduce((a, k) => a + bMap[k].boxes, 0);
 
-    /* توزيع العطايا على القطفات بنسبة حجمها */
-    const giftPerBatch = allocateBoxes(farmGifts, batchNames.map((k) => bMap[k].boxes));
+    /* عطايا كل قطفة — من سجلاتها الفعلية لا بالتناسب */
+    const giftByBatch = {};
+    (computedRows.gifts || [])
+      .filter((g) => !g.source || g.source === "إنتاج المزرعة")
+      .forEach((g) => {
+        const k = g.batch || "بدون قطفة";
+        giftByBatch[k] = (giftByBatch[k] || 0) + num(g.qty);
+      });
+    /* قطفة ذُكرت في العطايا ولم يُسجَّل لها إنتاج — أضفها للقائمة */
+    Object.keys(giftByBatch).forEach((k) => {
+      if (!bMap[k]) { bMap[k] = { batch: k, boxes: 0, date: null }; batchNames.push(k); }
+    });
+    batchNames.sort((a, b) => ordB(a) - ordB(b));
+    const giftPerBatch = batchNames.map((k) => giftByBatch[k] || 0);
 
     /* لكل قطفة: نصيب كل شريك، ما استلمه، ما بيع، وحصته من إيرادها */
     const batches = batchNames.map((k, bi) => {
@@ -3005,7 +3018,8 @@ function MainApp({ session }) {
       const totSellable = per.reduce((a, x) => a + x.sellable, 0);
       per.forEach((x) => { x.revenue = totSellable > 0 ? soldRev * (x.sellable / totSellable) : 0; });
 
-      return { batch: k, date: bMap[k].date, produced, gift, net, soldQty, soldRev, per };
+      const giftShare = allocateBoxes(gift, pcts);
+      return { batch: k, date: bMap[k].date, produced, gift, net, soldQty, soldRev, per, giftShare };
     });
 
     /* تجميع أرقام كل شريك عبر القطفات */
@@ -3016,9 +3030,7 @@ function MainApp({ session }) {
       const boxTaken = batches.reduce((a, b) => a + b.per[i].taken, 0);
       const sellable = batches.reduce((a, b) => a + b.per[i].sellable, 0);
       const salesShare = batches.reduce((a, b) => a + b.per[i].revenue, 0);
-      const giftMine = giftPerBatch.reduce((a, g, bi) => {
-        const alloc = allocateBoxes(g, pcts)[i] || 0; return a + alloc;
-      }, 0);
+      const giftMine = batches.reduce((a, b) => a + (b.giftShare ? b.giftShare[i] : 0), 0);
       const perBatch = batches.map((b) => ({
         batch: b.batch, date: b.date,
         share: b.per[i].share, taken: b.per[i].taken,
