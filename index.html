@@ -202,6 +202,23 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 /* بعض قيم الإعدادات تُخزَّن كنص JSON محاط بعلامتي اقتباس */
 const stripQuotes = (v) => String(v == null ? "open" : v).split(String.fromCharCode(34)).join("").trim() || "open";
 
+
+/* توزيع عدد صحيح من العلب على النسب — بلا كسور ولا فقدان علبة.
+   يُعطى كل شريك الجزء الصحيح، ثم تُوزَّع العلب الباقية
+   على أصحاب أكبر كسور (طريقة أكبر البواقي). */
+function allocateBoxes(total, pcts) {
+  const T = Math.round(num(total));
+  const sum = pcts.reduce((a, b) => a + num(b), 0) || 1;
+  const exact = pcts.map((p) => (T * num(p)) / sum);
+  const base = exact.map((v) => Math.floor(v));
+  let left = T - base.reduce((a, b) => a + b, 0);
+  const order = exact
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < order.length && left > 0; k++, left--) base[order[k].i] += 1;
+  return base;
+}
+
 /* ============ تعريف الجداول ============ */
 const TABLES = {
   bags: {
@@ -288,6 +305,7 @@ const TABLES = {
       { key: "date", label: "التاريخ", type: "date" },
       { key: "order_id", label: "رقم الطلب", type: "orderLink" },
       { key: "source", label: "مصدر التمر", type: "select", options: SOURCE_OPTIONS, required: true },
+      { key: "batch", label: "القطفة", type: "select", options: BATCH_OPTIONS },
       { key: "customer", label: "العميل", type: "text" },
       { key: "qty", label: "عدد العلب", type: "number" },
       { key: "unit_price", label: "سعر العلبة", type: "number", default: DEFAULT_BOX_PRICE },
@@ -306,7 +324,7 @@ const TABLES = {
       }
       return { ...row, total, remaining_for_customer: remainingForCustomer };
     },
-    display: ["date", "order_id", "source", "customer", "qty", "unit_price", "total", "remaining_for_customer", "payment_method", "notes"],
+    display: ["date", "order_id", "source", "batch", "customer", "qty", "unit_price", "total", "remaining_for_customer", "payment_method", "notes"],
     labels: { total: "الإجمالي", remaining_for_customer: "متبقٍ للعميل" },
     sum: ["qty", "total"],
   },
@@ -2174,6 +2192,7 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
   const [price, setPrice] = useState(boxPrice);
   const [pay, setPay] = useState("كاش");
   const [source, setSource] = useState(SOURCE_OPTIONS[0]);
+  const [batch, setBatch] = useState("");
   const [editLine, setEditLine] = useState(null);   // id السطر تحت التعديل
   const [lineDraft, setLineDraft] = useState({ qty: "", unit_price: "" });
 
@@ -2216,7 +2235,7 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
     run("deliver", async () => {
       await insertRow("sales", {
         date: todayISO(), order_id: order.id, customer: order.customer_name,
-        qty: q, unit_price: up, source,
+        qty: q, unit_price: up, source, batch: batch || null,
         payment_method: collected ? pay : null,
         collected: !!collected,
         collected_at: collected ? todayISO() : null,
@@ -2318,6 +2337,13 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
               <label style={{ ...lbl, flex: "1 1 100px" }}>التحصيل
                 <select value={pay} onChange={(e) => setPay(e.target.value)} style={{ ...inputStyle, marginTop: 4 }}>
                   {COLLECT_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </label>
+              <label style={{ ...lbl, flex: "1 1 100%" }}>القطفة
+                <select value={batch} onChange={(e) => setBatch(e.target.value)}
+                  style={{ ...inputStyle, marginTop: 4 }}>
+                  <option value="">— اختر القطفة —</option>
+                  {BATCH_OPTIONS.map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </label>
               <label style={{ ...lbl, flex: "1 1 100%" }}>يُخصم من مخزون
@@ -2937,28 +2963,85 @@ function MainApp({ session }) {
       .filter((r) => r.source === "إنتاج المزرعة")
       .reduce((s, r) => s + num(r.qty), 0);
 
-    /* نصيب كل شريك من العلب، وكم استلم منها */
-    const base = partners.map((p) => {
+    /* ===== محاسبة كل قطفة على حدة ===== */
+    const pcts = partners.map((p) => num(p.pct));
+    const farmSales = (computedRows.sales || []).filter((r) => r.source === "إنتاج المزرعة");
+
+    /* إنتاج كل قطفة */
+    const bMap = {};
+    (computedRows.boxes || [])
+      .filter((b) => b.source === "إنتاج المزرعة" && num(b.box_count) > 0)
+      .forEach((b) => {
+        const k = b.batch || "بدون قطفة";
+        if (!bMap[k]) bMap[k] = { batch: k, boxes: 0, date: b.date };
+        bMap[k].boxes += num(b.box_count);
+        if (b.date && (!bMap[k].date || b.date < bMap[k].date)) bMap[k].date = b.date;
+      });
+    const ordB = (k) => { const i = BATCH_OPTIONS.indexOf(k); return i === -1 ? 99 : i; };
+    const batchNames = Object.keys(bMap).sort((a, b) => ordB(a) - ordB(b));
+    const totalProduced = batchNames.reduce((a, k) => a + bMap[k].boxes, 0);
+
+    /* توزيع العطايا على القطفات بنسبة حجمها */
+    const giftPerBatch = allocateBoxes(farmGifts, batchNames.map((k) => bMap[k].boxes));
+
+    /* لكل قطفة: نصيب كل شريك، ما استلمه، ما بيع، وحصته من إيرادها */
+    const batches = batchNames.map((k, bi) => {
+      const produced = bMap[k].boxes;
+      const gift = giftPerBatch[bi] || 0;
+      const net = Math.max(0, produced - gift);
+      const shareAlloc = allocateBoxes(net, pcts);
+
+      const sold = farmSales.filter((r) => (r.batch || "بدون قطفة") === k);
+      const soldQty = sold.reduce((a, r) => a + num(r.qty), 0);
+      const soldRev = sold.reduce((a, r) => a + num(r.qty) * num(r.unit_price), 0);
+
+      const per = partners.map((p, i) => {
+        const taken = withdrawals
+          .filter((w) => w.partner_name === p.name && w.type === "علب دبس"
+                      && (w.batch || "بدون قطفة") === k)
+          .reduce((a, w) => a + num(w.qty), 0);
+        return { share: shareAlloc[i], taken, sellable: Math.max(0, shareAlloc[i] - taken) };
+      });
+      const totSellable = per.reduce((a, x) => a + x.sellable, 0);
+      per.forEach((x) => { x.revenue = totSellable > 0 ? soldRev * (x.sellable / totSellable) : 0; });
+
+      return { batch: k, date: bMap[k].date, produced, gift, net, soldQty, soldRev, per };
+    });
+
+    /* تجميع أرقام كل شريك عبر القطفات */
+    const base = partners.map((p, i) => {
       const mine = withdrawals.filter((w) => w.partner_name === p.name);
-      const boxShare = netBoxes * (num(p.pct) / 100);
-      const boxTaken = mine.filter((w) => w.type === "علب دبس").reduce((s, w) => s + num(w.qty), 0);
       const cashTaken = mine.filter((w) => w.type !== "علب دبس").reduce((s, w) => s + num(w.amount), 0);
-      return { p, mine, boxShare, boxTaken, cashTaken, sellable: Math.max(0, boxShare - boxTaken) };
+      const boxShare = batches.reduce((a, b) => a + b.per[i].share, 0);
+      const boxTaken = batches.reduce((a, b) => a + b.per[i].taken, 0);
+      const sellable = batches.reduce((a, b) => a + b.per[i].sellable, 0);
+      const salesShare = batches.reduce((a, b) => a + b.per[i].revenue, 0);
+      const giftMine = giftPerBatch.reduce((a, g, bi) => {
+        const alloc = allocateBoxes(g, pcts)[i] || 0; return a + alloc;
+      }, 0);
+      const perBatch = batches.map((b) => ({
+        batch: b.batch, date: b.date,
+        share: b.per[i].share, taken: b.per[i].taken,
+        sellable: b.per[i].sellable, revenue: b.per[i].revenue,
+        soldQty: b.soldQty,
+      }));
+      return { p, mine, boxShare, boxTaken, cashTaken,
+               giftAlloc: giftMine, sellable, salesShareByBatch: salesShare, perBatch };
     });
     /* مجموع العلب المتروكة للبيع باسم الشركاء */
     const totalSellable = base.reduce((s, b) => s + b.sellable, 0);
 
     return {
       netFarm, pctSum, farmBoxes, farmGifts, netBoxes,
-      farmSalesRev, farmNafiaRev, farmCost, farmSoldBoxes, totalSellable,
-      rows: base.map(({ p, mine, boxShare, boxTaken, cashTaken, sellable }) => {
+      farmSalesRev, farmNafiaRev, farmCost, farmSoldBoxes, totalSellable, batches,
+      rows: base.map((r0) => {
+        const { p, mine, boxShare, boxTaken, cashTaken, sellable, giftAlloc: gc, perBatch } = r0;
         const share = netFarm * (num(p.pct) / 100);
         const withdrawn = mine.reduce((s, w) => s + valueOf(w), 0);
-        const giftCut = farmGifts * (num(p.pct) / 100);
+        const giftCut = gc;
 
-        /* حصته من إيراد بيع العلب — بنسبة ما تُرك للبيع باسمه */
-        const salesShare = totalSellable > 0
-          ? farmSalesRev * (sellable / totalSellable) : 0;
+        /* حصته من إيراد البيع = مجموع حصصه من كل قطفة */
+        const salesShare = r0.salesShareByBatch;
         /* النفيعة والتكاليف تُقسّم بالنِّسب لأنها تخص المزرعة كلها */
         const nafiaShare = farmNafiaRev * (num(p.pct) / 100);
         const costShare  = farmCost * (num(p.pct) / 100);
@@ -2968,7 +3051,7 @@ function MainApp({ session }) {
         return {
           ...p, share, withdrawn, remaining: share - withdrawn,
           boxShare, giftCut, boxTaken, boxLeft: boxShare - boxTaken,
-          sellable, salesShare, nafiaShare, costShare, cashTaken, dueCash,
+          sellable, salesShare, nafiaShare, costShare, cashTaken, dueCash, perBatch,
         };
       }),
     };
@@ -3554,9 +3637,9 @@ function printPartnerStatement(partner, row, withdrawals) {
     </div>
     <h3 style="font-family:Cairo;font-size:15px;margin:0 0 10px">نصيبه من العلب المنتجة</h3>
     <div class="cards">
-      <div class="card"><div class="l">نصيبه من العلب</div><div class="v">${fmt(row.boxShare || 0, 1)} علبة</div></div>
+      <div class="card"><div class="l">نصيبه من العلب</div><div class="v">${fmt(row.boxShare || 0)} علبة</div></div>
       <div class="card"><div class="l">استلم علب</div><div class="v" style="color:#B5651D">${fmt(row.boxTaken || 0)}</div></div>
-      <div class="card"><div class="l">باقي له</div><div class="v" style="color:${(row.boxLeft || 0) >= 0 ? "#6B7A3A" : "#A63A32"}">${fmt(row.boxLeft || 0, 1)} علبة</div></div>
+      <div class="card"><div class="l">باقي له</div><div class="v" style="color:${(row.boxLeft || 0) >= 0 ? "#6B7A3A" : "#A63A32"}">${fmt(row.boxLeft || 0)} علبة</div></div>
     </div>
     <h3 style="font-family:Cairo;font-size:15px;margin:0 0 10px">سجل السحوبات</h3>
     <table>
@@ -3605,8 +3688,10 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
   const netTotal = totalBoxes - gifts;   // بعد خصم العطايا
   const shown = who ? partners.filter((p) => p.name === who) : partners;
 
-  /* نصيب شريك من قطفة */
-  const shareOf = (batch, p) => num(batch.box_count) * (num(p.pct) / 100);
+  /* نصيب شريك من قطفة — بعدد صحيح */
+  const pcts = partners.map((x) => num(x.pct));
+  const idxOf = (p) => partners.findIndex((x) => x.id === p.id);
+  const shareOf = (batch, p) => allocateBoxes(batch.box_count, pcts)[idxOf(p)] || 0;
 
   /* ما استلمه الشريك فعلاً كعلب */
   const takenOf = (p) => (withdrawals || [])
@@ -3621,14 +3706,14 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
   const copyPlan = (p) => {
     const lines = batches.map((b) => {
       const tk = takenFrom(p, b.batch);
-      return `• ${b.batch}: نصيبه ${fmt(shareOf(b, p), 1)} علبة`
+      return `• ${b.batch}: نصيبه ${fmt(shareOf(b, p))} علبة`
         + (tk > 0 ? ` — استلم ${fmt(tk)}` : "");
     });
     if (!lines.length) { showToast("لا توجد قطفات مسجّلة"); return; }
-    const total = netTotal * (num(p.pct) / 100);
+    const total = allocateBoxes(netTotal, pcts)[idxOf(p)] || 0;
     navigator.clipboard?.writeText([
       `نصيب ${p.name} (${fmt(p.pct, 2)}%)`, "", ...lines, "",
-      `الإجمالي: ${fmt(total, 1)} علبة`,
+      `الإجمالي: ${fmt(total)} علبة`,
       `قيمتها لو بيعت: ${fmt(total * boxPrice)} درهم`,
     ].join("\n"));
     showToast(`تم نسخ كشف ${p.name}`);
@@ -3692,7 +3777,7 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
                   const tk = takenFrom(p, b.batch);
                   return (
                     <td key={p.id} style={{ fontWeight: 700, color: COLORS.deep }}>
-                      {fmt(sh, 1)}
+                      {fmt(sh)}
                       {tk > 0 && (
                         <div style={{ fontSize: 10.5, color: COLORS.primary, fontWeight: 700 }}>
                           استلم {fmt(tk)}
@@ -3708,7 +3793,7 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
               <td style={{ fontWeight: 700 }}>{fmt(totalBoxes)}</td>
               {shown.map((p) => (
                 <td key={p.id} style={{ fontWeight: 700, color: COLORS.inkSoft }}>
-                  {fmt(totalBoxes * (num(p.pct) / 100), 1)}
+                  {fmt(allocateBoxes(totalBoxes, pcts)[idxOf(p)] || 0)}
                 </td>
               ))}
             </tr>
@@ -3718,7 +3803,7 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
                 <td style={{ fontWeight: 700, color: COLORS.alert }}>− {fmt(gifts)}</td>
                 {shown.map((p) => (
                   <td key={p.id} style={{ fontWeight: 700, color: COLORS.alert }}>
-                    − {fmt(gifts * (num(p.pct) / 100), 1)}
+                    − {fmt(allocateBoxes(gifts, pcts)[idxOf(p)] || 0)}
                   </td>
                 ))}
               </tr>
@@ -3728,7 +3813,7 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
               <td style={{ fontWeight: 800 }}>{fmt(netTotal)}</td>
               {shown.map((p) => (
                 <td key={p.id} style={{ fontWeight: 800, color: COLORS.secondary }}>
-                  {fmt(netTotal * (num(p.pct) / 100), 1)}
+                  {fmt(allocateBoxes(netTotal, pcts)[idxOf(p)] || 0)}
                 </td>
               ))}
             </tr>
@@ -3748,13 +3833,13 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
                 <tr style={{ background: COLORS.amberLight }}>
                   <td style={{ fontWeight: 800 }}>الباقي له</td>
                   <td style={{ fontWeight: 800 }}>
-                    {fmt(netTotal - shown.reduce((s, p) => s + takenOf(p), 0), 1)}
+                    {fmt(netTotal - shown.reduce((s, p) => s + takenOf(p), 0))}
                   </td>
                   {shown.map((p) => {
-                    const left = netTotal * (num(p.pct) / 100) - takenOf(p);
+                    const left = (allocateBoxes(netTotal, pcts)[idxOf(p)] || 0) - takenOf(p);
                     return (
                       <td key={p.id} style={{ fontWeight: 800, color: left >= 0 ? COLORS.deep : COLORS.alert }}>
-                        {fmt(left, 1)}
+                        {fmt(left)}
                       </td>
                     );
                   })}
@@ -3768,7 +3853,7 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
       {/* خيار الشريك: علب أو بيع */}
       <div style={{ display: "grid", gap: 9, marginTop: 14 }}>
         {shown.map((p) => {
-          const total = netTotal * (num(p.pct) / 100);
+          const total = allocateBoxes(netTotal, pcts)[idxOf(p)] || 0;
           const taken = takenOf(p);
           const left = total - taken;
           return (
@@ -3784,15 +3869,15 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
                 </button>
               </div>
               <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginTop: 7, lineHeight: 2 }}>
-                نصيبه <b style={{ color: COLORS.deep }}>{fmt(total, 1)} علبة</b>
+                نصيبه <b style={{ color: COLORS.deep }}>{fmt(total)} علبة</b>
                 {taken > 0 && <> · استلم <b style={{ color: COLORS.primary }}>{fmt(taken)}</b></>}
                 <br />
                 <span style={{ color: COLORS.secondary }}>
-                  🏠 لو أخذها علب: <b>{fmt(left, 1)} علبة</b> متاحة له
+                  🏠 لو أخذها علب: <b>{fmt(left)} علبة</b> متاحة له
                 </span>
                 <br />
                 <span style={{ color: COLORS.primary }}>
-                  💰 لو باعها: <b>{fmt(left * boxPrice)} درهم</b> ({fmt(left, 1)} × {fmt(boxPrice)})
+                  💰 لو باعها: <b>{fmt(left * boxPrice)} درهم</b> ({fmt(left)} × {fmt(boxPrice)})
                 </span>
               </div>
             </div>
@@ -3811,6 +3896,27 @@ function PartnerBatches({ partners, boxesRows, withdrawals, farmGifts, boxPrice,
   );
 }
 function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, boxPrice, onReload, showToast }) {
+  /* إنتاج كل قطفة من المزرعة */
+  const batchList = useMemo(() => {
+    const map = {};
+    (boxesRows || [])
+      .filter((b) => b.source === "إنتاج المزرعة" && num(b.box_count) > 0)
+      .forEach((b) => {
+        const k = b.batch || "بدون قطفة";
+        if (!map[k]) map[k] = { batch: k, boxes: 0, date: b.date };
+        map[k].boxes += num(b.box_count);
+        if (b.date && (!map[k].date || b.date < map[k].date)) map[k].date = b.date;
+      });
+    const ord = (k) => { const i = BATCH_OPTIONS.indexOf(k); return i === -1 ? 99 : i; };
+    return Object.values(map).sort((a, b) => ord(a.batch) - ord(b.batch));
+  }, [boxesRows]);
+
+  /* ما استلمه شريك من قطفة بعينها */
+  const takenFromBatch = (name, batchName) => (withdrawals || [])
+    .filter((w) => w.partner_name === name && w.type === "علب دبس"
+      && (w.batch || "بدون قطفة") === batchName)
+    .reduce((s2, w) => s2 + num(w.qty), 0);
+
   const [wForm, setWForm] = useState({ date: todayISO(), partner_name: "", type: "نقدي", batch: "", qty: "", amount: "", notes: "" });
   const [showForm, setShowForm] = useState(false);
 
@@ -3863,6 +3969,47 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
             العطايا تُخصم من الجميع بالتناسب قبل التقسيم.
           </div>
         )}
+
+        {/* تفصيل القطفات */}
+        {(distribution.batches || []).length > 0 && (
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(232,199,122,.28)" }}>
+            <div style={{ fontSize: 11.5, color: GOLD_LIGHT, fontWeight: 700, marginBottom: 8 }}>
+              إنتاج كل قطفة
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {(distribution.batches || []).map((b) => (
+                <div key={b.batch} style={{
+                  fontSize: 12.5, background: "rgba(255,255,255,.05)",
+                  borderRadius: 8, padding: "8px 11px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                    <span style={{ fontWeight: 700 }}>
+                      {b.batch}
+                      {b.date && <span style={{ color: "#A8927A", fontSize: 11, fontWeight: 400 }}> · {b.date}</span>}
+                    </span>
+                    <span style={{ fontWeight: 800, color: "#F3E9D8" }}>{fmt(b.produced)} علبة</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "#A8927A", marginTop: 4, lineHeight: 1.8 }}>
+                    {b.gift > 0 && <>عطايا {fmt(b.gift)} · </>}
+                    صافٍ <b style={{ color: "#B9D189" }}>{fmt(b.net)}</b>
+                    {" · "}بيع منها <b style={{ color: b.soldQty > 0 ? "#F5C563" : "#A8927A" }}>{fmt(b.soldQty)}</b>
+                    {b.soldRev > 0 && <> ({fmt(b.soldRev)} درهم)</>}
+                  </div>
+                </div>
+              ))}
+              <div style={{
+                display: "flex", justifyContent: "space-between",
+                fontSize: 12.5, padding: "7px 11px", fontWeight: 800,
+                borderTop: "1px solid rgba(232,199,122,.25)", marginTop: 2,
+              }}>
+                <span>مجموع الإنتاج</span>
+                <span style={{ color: "#B9D189" }}>
+                  {fmt((distribution.batches || []).reduce((a, b) => a + b.produced, 0))} علبة
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
         {distribution.farmBoxes === 0 && (
           <div style={{
             background: "rgba(232,167,156,.18)", borderRadius: 9, padding: "9px 12px",
@@ -3911,7 +4058,7 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
               }}>
                 <div>
                   <div style={{ color: COLORS.inkSoft }}>نصيبه من العلب 📦</div>
-                  <div style={{ fontWeight: 700, color: COLORS.deep }}>{fmt(row.boxShare, 1)} علبة</div>
+                  <div style={{ fontWeight: 700, color: COLORS.deep }}>{fmt(row.boxShare)} علبة</div>
                 </div>
                 <div>
                   <div style={{ color: COLORS.inkSoft }}>استلم علب</div>
@@ -3919,12 +4066,48 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
                 </div>
                 <div>
                   <div style={{ color: COLORS.inkSoft }}>باقي له</div>
-                  <div style={{ fontWeight: 800, color: row.boxLeft >= 0 ? COLORS.secondary : COLORS.alert }}>{fmt(row.boxLeft, 1)}</div>
+                  <div style={{ fontWeight: 800, color: row.boxLeft >= 0 ? COLORS.secondary : COLORS.alert }}>{fmt(row.boxLeft)}</div>
                 </div>
               </div>
               {row.giftCut > 0 && (
                 <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.8 }}>
-                  🎁 تحمّل من العطايا: <b style={{ color: COLORS.alert }}>{fmt(row.giftCut, 1)} علبة</b> (مخصومة من نصيبه أعلاه)
+                  🎁 تحمّل من العطايا: <b style={{ color: COLORS.alert }}>{fmt(row.giftCut)} علبة</b> (مخصومة من نصيبه أعلاه)
+                </div>
+              )}
+
+              {/* نصيبه من كل قطفة — محاسبة مستقلة */}
+              {(row.perBatch || []).length > 0 && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px dashed ${COLORS.line}` }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.deep, marginBottom: 7 }}>
+                    محاسبة القطفات
+                  </div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {row.perBatch.map((b) => {
+                      const done = b.sellable === 0;
+                      return (
+                        <div key={b.batch} style={{
+                          background: done ? "rgba(107,122,58,.08)" : COLORS.bg,
+                          border: `1px solid ${done ? COLORS.secondary : COLORS.line}`,
+                          borderRadius: 9, padding: "8px 11px", fontSize: 12,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                            <span style={{ fontWeight: 800, color: COLORS.deep }}>{b.batch}</span>
+                            <span style={{
+                              fontWeight: 800,
+                              color: b.revenue > 0 ? COLORS.secondary : COLORS.inkSoft,
+                            }}>
+                              {done && b.taken > 0 ? "استلمها كاملة" : `${fmt(b.revenue)} درهم`}
+                            </span>
+                          </div>
+                          <div style={{ color: COLORS.inkSoft, marginTop: 4, lineHeight: 1.9 }}>
+                            نصيبه <b style={{ color: COLORS.deep }}>{fmt(b.share)}</b>
+                            {b.taken > 0 && <> · استلم <b style={{ color: COLORS.primary }}>{fmt(b.taken)}</b></>}
+                            {" · "}متروك للبيع <b style={{ color: b.sellable > 0 ? COLORS.secondary : COLORS.inkSoft }}>{fmt(b.sellable)}</b>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -3971,10 +4154,10 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
                     🏠 استلم <b>{fmt(r.boxTaken)}</b> علبة
                   </span>
                   <span style={{ color: COLORS.secondary }}>
-                    💰 بيع له <b>{fmt(r.sellable, 1)}</b> علبة
+                    💰 بيع له <b>{fmt(r.sellable)}</b> علبة
                   </span>
                   <span style={{ color: COLORS.inkSoft }}>
-                    نصيبه {fmt(r.boxShare, 1)}
+                    نصيبه {fmt(r.boxShare)}
                   </span>
                 </div>
               </div>
