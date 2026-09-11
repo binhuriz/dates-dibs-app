@@ -3220,7 +3220,13 @@ function MainApp({ session }) {
         return { share: shareAlloc[i], taken, sellable: Math.max(0, shareAlloc[i] - taken) };
       });
       const totSellable = per.reduce((a, x) => a + x.sellable, 0);
-      per.forEach((x) => { x.revenue = totSellable > 0 ? soldRev * (x.sellable / totSellable) : 0; });
+      /* وزّع العلب المباعة على الشركاء بنسبة ما خُصّص للبيع لكل منهم */
+      const soldAlloc = allocateBoxes(Math.min(soldQty, totSellable), per.map((x) => x.sellable));
+      per.forEach((x, i) => {
+        x.sold = soldAlloc[i] || 0;                       // بيع له فعلاً
+        x.remaining = Math.max(0, x.sellable - x.sold);   // ما زال بالمخزن باسمه
+        x.revenue = soldQty > 0 ? soldRev * (x.sold / soldQty) : 0;
+      });
 
       const giftShare = allocateBoxes(gift, pcts);
       return { batch: k, date: bMap[k].date, produced, gift, net, soldQty, soldRev, per, giftShare };
@@ -3233,16 +3239,20 @@ function MainApp({ session }) {
       const boxShare = batches.reduce((a, b) => a + b.per[i].share, 0);
       const boxTaken = batches.reduce((a, b) => a + b.per[i].taken, 0);
       const sellable = batches.reduce((a, b) => a + b.per[i].sellable, 0);
+      const soldForMe = batches.reduce((a, b) => a + b.per[i].sold, 0);
+      const remainingBoxes = batches.reduce((a, b) => a + b.per[i].remaining, 0);
       const salesShare = batches.reduce((a, b) => a + b.per[i].revenue, 0);
       const giftMine = batches.reduce((a, b) => a + (b.giftShare ? b.giftShare[i] : 0), 0);
       const perBatch = batches.map((b) => ({
         batch: b.batch, date: b.date,
         share: b.per[i].share, taken: b.per[i].taken,
         sellable: b.per[i].sellable, revenue: b.per[i].revenue,
+        sold: b.per[i].sold, remaining: b.per[i].remaining,
         soldQty: b.soldQty,
       }));
       return { p, mine, boxShare, boxTaken, cashTaken,
-               giftAlloc: giftMine, sellable, salesShareByBatch: salesShare, perBatch };
+               giftAlloc: giftMine, sellable, soldForMe, remainingBoxes,
+               salesShareByBatch: salesShare, perBatch };
     });
     /* مجموع العلب المتروكة للبيع باسم الشركاء */
     const totalSellable = base.reduce((s, b) => s + b.sellable, 0);
@@ -3251,7 +3261,7 @@ function MainApp({ session }) {
       netFarm, pctSum, farmBoxes, farmGifts, netBoxes,
       farmSalesRev, farmNafiaRev, farmCost, farmSoldBoxes, totalSellable, batches,
       rows: base.map((r0) => {
-        const { p, mine, boxShare, boxTaken, cashTaken, sellable, giftAlloc: gc, perBatch } = r0;
+        const { p, mine, boxShare, boxTaken, cashTaken, sellable, soldForMe, remainingBoxes, giftAlloc: gc, perBatch } = r0;
         const share = netFarm * (num(p.pct) / 100);
         const withdrawn = mine.reduce((s, w) => s + valueOf(w), 0);
         const giftCut = gc;
@@ -3267,7 +3277,7 @@ function MainApp({ session }) {
         return {
           ...p, share, withdrawn, remaining: share - withdrawn,
           boxShare, giftCut, boxTaken, boxLeft: boxShare - boxTaken,
-          sellable, salesShare, nafiaShare, costShare, cashTaken, dueCash, perBatch,
+          sellable, soldForMe, remainingBoxes, salesShare, nafiaShare, costShare, cashTaken, dueCash, perBatch,
         };
       }),
     };
@@ -4300,12 +4310,14 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
                   <div style={{ fontWeight: 700, color: COLORS.deep }}>{fmt(row.boxShare)} علبة</div>
                 </div>
                 <div>
-                  <div style={{ color: COLORS.inkSoft }}>استلم علب</div>
-                  <div style={{ fontWeight: 700, color: COLORS.primary }}>{fmt(row.boxTaken)}</div>
+                  <div style={{ color: COLORS.inkSoft }}>استلم / بيع له</div>
+                  <div style={{ fontWeight: 700, color: COLORS.primary }}>
+                    {fmt(row.boxTaken)} / {fmt(row.soldForMe)}
+                  </div>
                 </div>
                 <div>
-                  <div style={{ color: COLORS.inkSoft }}>باقي له</div>
-                  <div style={{ fontWeight: 800, color: row.boxLeft >= 0 ? COLORS.secondary : COLORS.alert }}>{fmt(row.boxLeft)}</div>
+                  <div style={{ color: COLORS.inkSoft }}>باقٍ بالمخزن</div>
+                  <div style={{ fontWeight: 800, color: COLORS.secondary }}>{fmt(row.remainingBoxes)}</div>
                 </div>
               </div>
               {row.giftCut > 0 && (
@@ -4322,11 +4334,11 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
                   </div>
                   <div style={{ display: "grid", gap: 6 }}>
                     {row.perBatch.map((b) => {
-                      const done = b.sellable === 0;
+                      const settled = b.remaining === 0;
                       return (
                         <div key={b.batch} style={{
-                          background: done ? "rgba(107,122,58,.08)" : COLORS.bg,
-                          border: `1px solid ${done ? COLORS.secondary : COLORS.line}`,
+                          background: settled ? "rgba(107,122,58,.08)" : COLORS.bg,
+                          border: `1px solid ${settled ? COLORS.secondary : COLORS.line}`,
                           borderRadius: 9, padding: "8px 11px", fontSize: 12,
                         }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
@@ -4335,13 +4347,16 @@ function Partners({ partners, distribution, withdrawals, boughtNet, boxesRows, b
                               fontWeight: 800,
                               color: b.revenue > 0 ? COLORS.secondary : COLORS.inkSoft,
                             }}>
-                              {done && b.taken > 0 ? "استلمها كاملة" : `${fmt(b.revenue)} درهم`}
+                              {b.revenue > 0 ? `${fmt(b.revenue)} درهم`
+                                : (b.taken > 0 && b.sellable === 0 ? "استلمها كاملة" : "—")}
                             </span>
                           </div>
                           <div style={{ color: COLORS.inkSoft, marginTop: 4, lineHeight: 1.9 }}>
                             نصيبه <b style={{ color: COLORS.deep }}>{fmt(b.share)}</b>
                             {b.taken > 0 && <> · استلم <b style={{ color: COLORS.primary }}>{fmt(b.taken)}</b></>}
-                            {" · "}متروك للبيع <b style={{ color: b.sellable > 0 ? COLORS.secondary : COLORS.inkSoft }}>{fmt(b.sellable)}</b>
+                            {b.sold > 0 && <> · بيع له <b style={{ color: COLORS.secondary }}>{fmt(b.sold)}</b></>}
+                            {" · "}باقٍ بالمخزن{" "}
+                            <b style={{ color: b.remaining > 0 ? COLORS.deep : COLORS.secondary }}>{fmt(b.remaining)}</b>
                           </div>
                         </div>
                       );
