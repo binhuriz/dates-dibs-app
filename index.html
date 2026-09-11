@@ -336,10 +336,12 @@ const TABLES = {
       { key: "qty_sacks", label: "الكمية (عدد الجوالي)", type: "number" },
       { key: "unit_price", label: "سعر بيع الجوال", type: "number" },
       { key: "buyer", label: "المشتري", type: "text" },
+      { key: "collected", label: "حالة التحصيل", type: "select", options: ["محصّل", "آجل"] },
+      { key: "payment_method", label: "طريقة التحصيل", type: "select", options: COLLECT_OPTIONS },
       { key: "notes", label: "ملاحظات", type: "text" },
     ],
     computed: (row) => ({ ...row, total: row.qty_sacks && row.unit_price ? num(row.qty_sacks) * num(row.unit_price) : "" }),
-    display: ["date", "source", "qty_sacks", "unit_price", "total", "buyer", "notes"],
+    display: ["date", "source", "qty_sacks", "unit_price", "total", "buyer", "collected", "payment_method", "notes"],
     labels: { total: "الإجمالي" },
     sum: ["qty_sacks", "total"],
   },
@@ -417,7 +419,7 @@ function computeSourceSummary(rows) {
     const salesRev = sales.filter((r) => r.source === source).reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
     const nafiaRev = nafia.filter((r) => r.source === source).reduce((s, r) => s + num(r.qty_sacks) * num(r.unit_price), 0);
     const cost = costs.filter((r) => r.source === source).reduce((s, r) => s + num(r.amount), 0);
-    return { bagsCount, boxes: boxesCount, purchasedBoxes: source === "تمور مشتراة" ? purchasedBoxes : 0, purchasedPalms: source === "تمور مشتراة" ? purchasedPalms : 0, salesRev, nafiaRev, cost, net: salesRev + nafiaRev - cost };
+    return { bagsCount, boxes: boxesCount, purchasedBoxes: source === "تمور مشتراة" ? purchasedBoxes : 0, purchasedPalms: source === "تمور مشتراة" ? purchasedPalms : 0, salesRev, nafiaRev, cost, net: salesRev - cost };
   };
   return { farm: bySource("إنتاج المزرعة"), bought: bySource("تمور مشتراة") };
 }
@@ -431,7 +433,7 @@ function computeDash(rows) {
   const nafiaSacks = nafia.reduce((s, r) => s + num(r.qty_sacks), 0);
   const salesRevenue = sales.reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
   const nafiaRevenue = nafia.reduce((s, r) => s + num(r.qty_sacks) * num(r.unit_price), 0);
-  const totalRevenue = salesRevenue + nafiaRevenue;
+  const totalRevenue = salesRevenue;   /* النفيعة تُحسب منفصلة */
   const totalCosts = costs.reduce((s, r) => s + num(r.amount), 0);
   const totalBags = bagsFarm + bagsBought, totalBoxes = boxesFarm + boxesBought;
 
@@ -468,8 +470,27 @@ function computeDash(rows) {
     sales.filter((r) => r.source !== FARM && r.source !== BOUGHT).reduce((s, r) => s + num(r.qty), 0)
     + gifts.filter((r) => r.source && r.source !== FARM && r.source !== BOUGHT).reduce((s, r) => s + num(r.qty), 0);
 
+  /* إيراد كل مصدر على حدة */
+  const revOf = (src) => sales.filter((r) => r.source === src)
+    .reduce((s2, r) => s2 + num(r.qty) * num(r.unit_price), 0);
+  const salesRevFarm = revOf(FARM);
+  const salesRevBought = revOf(BOUGHT);
+  /* المحصّل والآجل */
+  const collectedSales = sales.filter((r) => r.collected)
+    .reduce((s2, r) => s2 + num(r.qty) * num(r.unit_price), 0);
+  const dueSales = salesRevenue - collectedSales;
+  const nafiaCollected = nafia.filter((r) => r.collected === "محصّل")
+    .reduce((s2, r) => s2 + num(r.qty_sacks) * num(r.unit_price), 0);
+  const dueNafia = nafiaRevenue - nafiaCollected;
+  const nafiaOf = (src) => nafia.filter((r) => r.source === src)
+    .reduce((s2, r) => s2 + num(r.qty_sacks) * num(r.unit_price), 0);
+  const nafiaFarm = nafiaOf(FARM);
+  const nafiaBought = nafiaOf(BOUGHT);
+
   return {
     farmStock, boughtStock, unassigned,
+    salesRevFarm, salesRevBought, collectedSales, dueSales, nafiaCollected, dueNafia,
+    nafiaFarm, nafiaBought,
     bagsFarm, bagsBought, boxesFarm, boxesBought, totalDibs, nafiaSacks, salesRevenue, nafiaRevenue,
     totalRevenue, totalCosts, netProfit: totalRevenue - totalCosts,
     avgBoxesPerBag: totalBags > 0 ? totalBoxes / totalBags : 0,
@@ -1837,7 +1858,7 @@ function StoryPage() {
 
 /* ============ العائدات حسب المصدر ============ */
 
-function ProfitPanel({ sales, nafia, costs, purchases, boxPrice }) {
+function ProfitPanel({ sales, nafia, costs, purchases, boxPrice, partners }) {
   const FARM = "إنتاج المزرعة", BOUGHT = "تمور مشتراة";
   const [who, setWho] = useState("all");   // all | farm | bought
 
@@ -1853,8 +1874,8 @@ function ProfitPanel({ sales, nafia, costs, purchases, boxPrice }) {
       .reduce((s, r) => s + num(r.qty) * num(r.unit_price), 0);
     return {
       boxes, salesRev, nafiaRev, cost,
-      revenue: salesRev + nafiaRev,
-      net: salesRev + nafiaRev - cost,
+      revenue: salesRev,
+      net: salesRev - cost,
       collected, due: salesRev - collected,
       avg: boxes > 0 ? salesRev / boxes : 0,
       rows: sl,
@@ -1891,10 +1912,6 @@ function ProfitPanel({ sales, nafia, costs, purchases, boxPrice }) {
             <tr>
               <td style={{ color: COLORS.inkSoft, padding: "5px 0" }}>إيراد المبيعات</td>
               <td style={{ fontWeight: 700, textAlign: "left", color: COLORS.secondary }}>{fmt(d.salesRev)}</td>
-            </tr>
-            <tr>
-              <td style={{ color: COLORS.inkSoft, padding: "5px 0" }}>إيراد النفيعة</td>
-              <td style={{ fontWeight: 700, textAlign: "left", color: COLORS.secondary }}>{fmt(d.nafiaRev)}</td>
             </tr>
             <tr>
               <td style={{ color: COLORS.inkSoft, padding: "5px 0" }}>− التكاليف</td>
@@ -1973,6 +1990,143 @@ function ProfitPanel({ sales, nafia, costs, purchases, boxPrice }) {
           : <Card key={k} title="تمور مشتراة — ناصر" icon="🧺" d={d} accent={COLORS.primary} />
         )}
       </div>
+
+      {/* النفيعة — حساب مستقل */}
+      {(() => {
+        const rows = nafia || [];
+        if (!rows.length) return null;
+        const sacks = rows.reduce((a, r) => a + num(r.qty_sacks), 0);
+        const rev = rows.reduce((a, r) => a + num(r.qty_sacks) * num(r.unit_price), 0);
+        const got = rows.filter((r) => r.collected === "محصّل")
+          .reduce((a, r) => a + num(r.qty_sacks) * num(r.unit_price), 0);
+        const due = rev - got;
+        const farmRev = rows.filter((r) => r.source === FARM)
+          .reduce((a, r) => a + num(r.qty_sacks) * num(r.unit_price), 0);
+        const boughtRev = rows.filter((r) => r.source === BOUGHT)
+          .reduce((a, r) => a + num(r.qty_sacks) * num(r.unit_price), 0);
+        return (
+          <div style={{
+            background: COLORS.surface, border: `1px solid ${COLORS.line}`,
+            borderInlineStart: `5px solid #6B7A3A`, borderRadius: 14,
+            padding: 16, marginBottom: 18,
+          }}>
+            <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 16, color: COLORS.deep, marginBottom: 4 }}>
+              🌿 النفيعة — حساب مستقل
+            </div>
+            <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 12, lineHeight: 1.8 }}>
+              لا تدخل في أرباح الدبس ولا في أنصبة الشركاء.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+              {[
+                { l: "الجوالي المباعة", v: `${fmt(sacks)} جوال`, c: COLORS.ink },
+                { l: "إجمالي الإيراد", v: fmt(rev), c: COLORS.deep },
+                { l: "محصّل", v: fmt(got), c: COLORS.secondary },
+                { l: "آجل — بالذمم", v: fmt(due), c: due > 0 ? COLORS.alert : COLORS.inkSoft },
+              ].map((x) => (
+                <div key={x.l} style={{ background: COLORS.bg, borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>{x.l}</div>
+                  <div style={{ fontFamily: "Cairo, sans-serif", fontWeight: 800, fontSize: 17, color: x.c, marginTop: 3 }}>
+                    {x.v}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* تفصيل كل مصدر */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10, marginTop: 12 }}>
+              {[
+                { key: FARM, icon: "🌴", label: "نفيعة المزرعة", accent: COLORS.secondary },
+                { key: BOUGHT, icon: "🧺", label: "نفيعة التمور المشتراة", accent: COLORS.primary },
+              ].map((sc) => {
+                const list = rows.filter((r) => r.source === sc.key);
+                const sk = list.reduce((a, r) => a + num(r.qty_sacks), 0);
+                const rv = list.reduce((a, r) => a + num(r.qty_sacks) * num(r.unit_price), 0);
+                const gt = list.filter((r) => r.collected === "محصّل")
+                  .reduce((a, r) => a + num(r.qty_sacks) * num(r.unit_price), 0);
+                const dd = rv - gt;
+                return (
+                  <div key={sc.key} style={{
+                    background: COLORS.bg, borderRadius: 11, padding: "12px 14px",
+                    borderInlineStart: `4px solid ${sc.accent}`,
+                  }}>
+                    <div style={{ fontWeight: 800, fontSize: 13.5, color: sc.accent, marginBottom: 7 }}>
+                      {sc.icon} {sc.label}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 2.1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>الجوالي</span><b style={{ color: COLORS.ink }}>{fmt(sk)} جوال</b>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>الإيراد</span><b style={{ color: COLORS.deep }}>{fmt(rv)}</b>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>محصّل</span><b style={{ color: COLORS.secondary }}>{fmt(gt)}</b>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>آجل</span>
+                        <b style={{ color: dd > 0 ? COLORS.alert : COLORS.inkSoft }}>{dd > 0 ? fmt(dd) : "—"}</b>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* توزيع نفيعة المزرعة على الشركاء */}
+            {(() => {
+              const list = rows.filter((r) => r.source === FARM);
+              const rv = list.reduce((a, r) => a + num(r.qty_sacks) * num(r.unit_price), 0);
+              const gt = list.filter((r) => r.collected === "محصّل")
+                .reduce((a, r) => a + num(r.qty_sacks) * num(r.unit_price), 0);
+              const ps = partners || [];
+              if (rv <= 0 || !ps.length) return null;
+              const sum = ps.reduce((a, x) => a + num(x.pct), 0) || 1;
+              return (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px dashed ${COLORS.line}` }}>
+                  <div style={{ fontWeight: 800, fontSize: 13.5, color: COLORS.deep, marginBottom: 3 }}>
+                    🤝 توزيع نفيعة المزرعة على الشركاء
+                  </div>
+                  <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginBottom: 10, lineHeight: 1.8 }}>
+                    بالنِّسب نفسها — ومستقلة تماماً عن حساب العلب.
+                  </div>
+                  <div style={{ display: "grid", gap: 7 }}>
+                    {ps.map((x) => {
+                      const share = rv * (num(x.pct) / sum);
+                      const inHand = gt * (num(x.pct) / sum);
+                      const pend = share - inHand;
+                      return (
+                        <div key={x.id} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          flexWrap: "wrap", gap: 8, background: COLORS.bg,
+                          borderRadius: 9, padding: "9px 12px", fontSize: 12.5,
+                        }}>
+                          <span style={{ fontWeight: 700, color: COLORS.deep }}>
+                            {x.name}
+                            <span style={{ color: COLORS.inkSoft, fontWeight: 400, fontSize: 11 }}>
+                              {" "}· {fmt(x.pct, 2)}%
+                            </span>
+                          </span>
+                          <span style={{ color: COLORS.inkSoft }}>
+                            نصيبه <b style={{ color: COLORS.secondary }}>{fmt(share)}</b>
+                            {pend > 0 && <> · منها آجل <b style={{ color: COLORS.alert }}>{fmt(pend)}</b></>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div style={{
+                      display: "flex", justifyContent: "space-between",
+                      padding: "9px 12px", fontSize: 12.5, fontWeight: 800,
+                      background: COLORS.amberLight, borderRadius: 9,
+                    }}>
+                      <span>الإجمالي</span>
+                      <span style={{ color: COLORS.deep }}>{fmt(rv)} درهم</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        );
+      })()}
 
       {generalCost > 0 && (
         <div style={{
@@ -2085,7 +2239,7 @@ function ProfitPanel({ sales, nafia, costs, purchases, boxPrice }) {
       </div>
 
       <div style={{ fontSize: 11.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.9 }}>
-        صافي كل جهة = إيراد المبيعات + إيراد النفيعة − التكاليف المسجّلة لها.
+        صافي كل جهة = إيراد بيع الدبس − التكاليف المسجّلة لها. النفيعة خارج هذا الحساب.
         صافي عائد المزرعة هو ما يُقسّم على الشركاء في تبويب «الشركاء».
       </div>
     </div>
@@ -3105,7 +3259,7 @@ function MainApp({ session }) {
         /* حصته من إيراد البيع = مجموع حصصه من كل قطفة */
         const salesShare = r0.salesShareByBatch;
         /* النفيعة والتكاليف تُقسّم بالنِّسب لأنها تخص المزرعة كلها */
-        const nafiaShare = farmNafiaRev * (num(p.pct) / 100);
+        const nafiaShare = 0;   /* النفيعة منفصلة عن أرباح الدبس */
         const costShare  = farmCost * (num(p.pct) / 100);
         /* المستحق نقداً = إيراده − تكاليفه − ما سحبه نقداً */
         const dueCash = salesShare + nafiaShare - costShare - cashTaken;
@@ -3229,6 +3383,7 @@ function MainApp({ session }) {
             nafia={filteredRows.nafia || []}
             costs={filteredRows.costs || []}
             purchases={filteredRows.purchases || []}
+            partners={data.partners || []}
             boxPrice={boxPrice} />
         )}
         {tab === "collect" && (
@@ -3386,11 +3541,33 @@ function Dashboard({ dash, onReload }) {
         <StatCard label="إجمالي الدبس (كجم)" value={fmt(dash.totalDibs)} icon="🍯" />
         <StatCard label="النفيعة (جوال)" value={fmt(dash.nafiaSacks)} icon="🌿" />
       </div>
-      <SectionTitle title="الإيرادات والتكاليف" />
+      <SectionTitle title="إيراد بيع الدبس" subtitle="كل مصدر على حدة" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 26 }}>
+        <StatCard label="🌴 إيراد المزرعة" value={fmt(dash.salesRevFarm)} icon="💵" accent={COLORS.secondary} />
+        <StatCard label="🧺 إيراد التمور المشتراة" value={fmt(dash.salesRevBought)} icon="💵" accent={COLORS.primary} />
+        <StatCard label="إجمالي إيراد الدبس" value={fmt(dash.salesRevenue)} icon="📈" accent={COLORS.deep} />
+      </div>
+
+      <SectionTitle title="التحصيل والذمم" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 26 }}>
+        <StatCard label="محصّل من الدبس" value={fmt(dash.collectedSales)} icon="✅" accent={COLORS.secondary} />
+        <StatCard label="آجل — بانتظار التحصيل" value={fmt(dash.dueSales)} icon="⏳"
+          accent={dash.dueSales > 0 ? COLORS.alert : COLORS.inkSoft} />
+        <StatCard label="آجل من النفيعة" value={fmt(dash.dueNafia)} icon="🌿"
+          accent={dash.dueNafia > 0 ? COLORS.alert : COLORS.inkSoft} />
+        <StatCard label="إجمالي الذمم" value={fmt(dash.dueSales + dash.dueNafia)} icon="📌"
+          accent={(dash.dueSales + dash.dueNafia) > 0 ? COLORS.alert : COLORS.secondary} />
+      </div>
+
+      <SectionTitle title="النفيعة" subtitle="حساب مستقل — لا يدخل أرباح الدبس ولا أنصبة الشركاء" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 26 }}>
+        <StatCard label="🌴 نفيعة المزرعة" value={fmt(dash.nafiaFarm)} icon="🌿" accent={COLORS.secondary} />
+        <StatCard label="🧺 نفيعة المشتراة" value={fmt(dash.nafiaBought)} icon="🌿" accent={COLORS.primary} />
+        <StatCard label="إجمالي النفيعة" value={fmt(dash.nafiaRevenue)} icon="📊" accent={COLORS.deep} />
+      </div>
+
+      <SectionTitle title="التكاليف" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-        <StatCard label="إيراد المبيعات" value={fmt(dash.salesRevenue)} icon="💵" />
-        <StatCard label="إيراد النفيعة" value={fmt(dash.nafiaRevenue)} icon="💵" />
-        <StatCard label="إجمالي الإيرادات" value={fmt(dash.totalRevenue)} icon="📈" accent={COLORS.secondary} />
         <StatCard label="إجمالي التكاليف" value={fmt(dash.totalCosts)} icon="📉" accent={COLORS.alert} />
       </div>
     </div>
@@ -3401,8 +3578,8 @@ function SourceSummary({ summary }) {
   const rows = [
     { label: "الأكياس", key: "bagsCount" }, { label: "العلب", key: "boxes" },
     { label: "صناديق مشتراة", key: "purchasedBoxes" }, { label: "نخيل مشتراة", key: "purchasedPalms" },
-    { label: "إيراد المبيعات", key: "salesRev" }, { label: "إيراد النفيعة", key: "nafiaRev" },
-    { label: "التكاليف", key: "cost" }, { label: "صافي العائد", key: "net", bold: true },
+    { label: "إيراد المبيعات", key: "salesRev" }, { label: "إيراد النفيعة (منفصل)", key: "nafiaRev" },
+    { label: "التكاليف", key: "cost" }, { label: "صافي عائد الدبس", key: "net", bold: true },
   ];
   return (
     <div>
