@@ -2391,12 +2391,14 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
     if (qf > 0 && !batch) { showToast("اختر القطفة لعلب المزرعة"); return; }
 
     /* تحذير نقص المخزون — مع إمكانية المتابعة */
-    const shortFarm = stock ? qf - num(stock.farm) : 0;
-    const shortBought = stock ? qb - num(stock.bought) : 0;
+    const availFarm = stock ? Math.max(0, num(stock.farm)) : Infinity;
+    const availBought = stock ? Math.max(0, num(stock.bought)) : Infinity;
+    const shortFarm = qf > 0 ? qf - availFarm : 0;
+    const shortBought = qb > 0 ? qb - availBought : 0;
     if (shortFarm > 0 || shortBought > 0) {
       const parts = [];
-      if (shortFarm > 0) parts.push(`🌴 المزرعة: ناقص ${fmt(shortFarm)} علبة`);
-      if (shortBought > 0) parts.push(`🧺 مشتراة: ناقص ${fmt(shortBought)} علبة`);
+      if (shortFarm > 0) parts.push(`🌴 المزرعة: متوفر ${fmt(availFarm)} — ناقص ${fmt(shortFarm)} علبة`);
+      if (shortBought > 0) parts.push(`🧺 مشتراة: متوفر ${fmt(availBought)} — ناقص ${fmt(shortBought)} علبة`);
       if (!window.confirm(`⚠️ المخزون لا يكفي:\n${parts.join("\n")}\n\nتريد المتابعة على أي حال؟`)) return;
     }
 
@@ -2504,7 +2506,8 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
                   val: qtyBought, set: setQtyBought, avail: stock ? num(stock.bought) : null, accent: COLORS.primary },
               ].map((r) => {
                 const v = num(r.val);
-                const short = r.avail !== null && v > r.avail;
+                const availNow = r.avail === null ? null : Math.max(0, r.avail);
+                const short = availNow !== null && v > 0 && v > availNow;
                 return (
                   <div key={r.key} style={{
                     display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap",
@@ -2513,9 +2516,12 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
                   }}>
                     <span style={{ flex: "1 1 130px", fontSize: 12.5, fontWeight: 700, color: r.accent }}>
                       {r.icon} {r.label}
-                      {r.avail !== null && (
+                      {availNow !== null && (
                         <span style={{ color: COLORS.inkSoft, fontWeight: 400, fontSize: 11 }}>
-                          {" "}· متوفر {fmt(r.avail)}
+                          {" "}· متوفر {fmt(availNow)}
+                          {r.avail < 0 && (
+                            <b style={{ color: COLORS.alert }}> (عجز {fmt(Math.abs(r.avail))})</b>
+                          )}
                         </span>
                       )}
                     </span>
@@ -2524,14 +2530,14 @@ function OrderDetail({ order, sales, onClose, onReload, showToast, boxPrice, sto
                       style={{ ...inputStyle, width: 80, textAlign: "center",
                                borderColor: short ? COLORS.alert : COLORS.line }} />
                     {r.avail !== null && (
-                      <button type="button" onClick={() => r.set(String(Math.max(0, Math.min(r.avail, rem - num(r.key === "farm" ? qtyBought : qtyFarm)))))}
+                      <button type="button" onClick={() => r.set(String(Math.max(0, Math.min(availNow, rem - num(r.key === "farm" ? qtyBought : qtyFarm)))))}
                         style={{ ...ghostBtnStyle, padding: "6px 10px", fontSize: 11 }}>
                         الأقصى
                       </button>
                     )}
                     {short && (
                       <span style={{ flexBasis: "100%", fontSize: 11, color: COLORS.alert, fontWeight: 700 }}>
-                        ⚠️ ناقص {fmt(v - r.avail)} علبة من هذا المصدر
+                        ⚠️ ناقص {fmt(v - availNow)} علبة من هذا المصدر
                       </span>
                     )}
                   </div>
@@ -3522,6 +3528,22 @@ function Dashboard({ dash, onReload }) {
           </tbody>
         </table>
       </div>
+
+      {(dash.farmStock.available < 0 || dash.boughtStock.available < 0) && (
+        <div style={{
+          background: "#FBEAE8", border: `1px solid ${COLORS.alert}`, color: COLORS.alert,
+          borderRadius: 12, padding: "11px 14px", fontSize: 12.5, marginBottom: 14,
+          lineHeight: 2, fontWeight: 600,
+        }}>
+          ⚠️ <b>عجز في المخزون</b> — خرج أكثر مما أُنتج:
+          {dash.farmStock.available < 0 && <> 🌴 المزرعة بـ{fmt(Math.abs(dash.farmStock.available))} علبة.</>}
+          {dash.boughtStock.available < 0 && <> 🧺 إنتاج ناصر بـ{fmt(Math.abs(dash.boughtStock.available))} علبة.</>}
+          <br />
+          <span style={{ fontWeight: 400 }}>
+            راجع إنتاج العلب — قد يكون الإنتاج غير مسجّل كاملاً، أو بيعت علب من المصدر الخطأ.
+          </span>
+        </div>
+      )}
 
       {dash.unassigned > 0 && (
         <div style={{
